@@ -1,1 +1,4 @@
 "id","name","model_id:id","group_id:id","perm_read","perm_write","perm_create","perm_unlink"
+"acc_account_auto_payment","Account auto payment","account_auto_payment.model_account_auto_payment","",1,1,1,1
+"acc_account_auto_payment_type","Account auto payment type","account_auto_payment.model_account_move_type","",1,1,1,1
+"acc_account_auto_payment_group","Account auto payment group","account_auto_payment.model_account_move_line_group","",1,1,1,1
