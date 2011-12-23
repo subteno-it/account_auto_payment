@@ -37,9 +37,10 @@
     'update_xml': [
         #'security/groups.xml',
         #'security/ir.model.access.csv',
-        #'view/menu.xml',
+        'view/menu.xml',
         'view/account_view.xml',
         #'wizard/wizard.xml',
+        'wizard/account_auto_payment.xml',
         #'report/report.xml',
         'data/account_move_type.xml',
     ],

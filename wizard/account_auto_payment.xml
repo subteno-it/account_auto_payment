@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+    <data>
+        ##############################################################################
+        #
+        #    account_auto_payment module for OpenERP, add wizard to make the payment auto
+        #    Copyright (C) 2011 SYLEAM Info Services ([http://www.syleam.fr/]) 
+        #              Jean-Sébastien SUZANNE [jean-sebastien.suzanne@syleam.fr]
+        #
+        #    This file is a part of account_auto_payment
+        #
+        #    account_auto_payment is free software: you can redistribute it and/or modify
+        #    it under the terms of the GNU General Public License as published by
+        #    the Free Software Foundation, either version 3 of the License, or
+        #    (at your option) any later version.
+        #
+        #    account_auto_payment is distributed in the hope that it will be useful,
+        #    but WITHOUT ANY WARRANTY; without even the implied warranty of
+        #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        #    GNU General Public License for more details.
+        #
+        #    You should have received a copy of the GNU General Public License
+        #    along with this program.  If not, see [http://www.gnu.org/licenses/].
+        #
+        ##############################################################################
+
+        <record id="view_account_auto_payment_form" model="ir.ui.view">
+            <field name="name">account.auto.payment.form</field>
+            <field name="model">account.auto.payment</field>
+            <field name="type">form</field>
+            <field name="priority" eval="8"/>
+            <field name="arch" type="xml">
+                <form string="Select move">
+                    <field name="type" invisible="1"/>
+                    <field name="maturity_date"/>
+                    <field name="payment_date"/>
+                    <field name="journal_id" domain="[('type', '=', type)]"/>
+                    <field name="bank_journal_id"/>
+                    <separator string=" " colspan="4"/>
+                    <group colspan="4" col="2">
+                        <button string="Cancel" special="cancel" icon="gtk-cancel"/>
+                        <button string="Select moves" icon="gtk-ok" type="object" name="select_moves"/>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="act_open_account_auto_payment_traite_view">
+            <field name="name">Traite</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">account.auto.payment</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="domain">[]</field>
+            <field name="context">{'default_type': 'traite'}</field>
+        </record>
+
+        <record model="ir.actions.act_window.view" id="act_open_account_auto_payment_traite_view_form">
+            <field name="act_window_id" ref="act_open_account_auto_payment_traite_view"/>
+            <field name="sequence" eval="20"/>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_account_auto_payment_form"/>
+        </record>
+
+        <menuitem id="menu_account_auto_payment_traite"
+            parent="menu_account_auto_payment"
+            sequence="10"
+            action="act_open_account_auto_payment_traite_view"/>
+
+        <record model="ir.actions.act_window" id="act_open_account_auto_payment_virement_view">
+            <field name="name">Virement</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">account.auto.payment</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="domain">[]</field>
+            <field name="context">{'default_type': 'purchase'}</field>
+        </record>
+
+        <record model="ir.actions.act_window.view" id="act_open_account_auto_payment_virement_view_form">
+            <field name="act_window_id" ref="act_open_account_auto_payment_virement_view"/>
+            <field name="sequence" eval="20"/>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_account_auto_payment_form"/>
+        </record>
+
+        <menuitem id="menu_account_auto_payment_virement"
+            parent="menu_account_auto_payment"
+            sequence="20"
+            action="act_open_account_auto_payment_virement_view"/>
+
+        <record model="ir.actions.act_window" id="act_open_account_auto_payment_cheque_view">
+            <field name="name">Cheque</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">account.auto.payment</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="domain">[]</field>
+            <field name="context">{'default_type': 'cheque'}</field>
+        </record>
+
+        <record model="ir.actions.act_window.view" id="act_open_account_auto_payment_cheque_view_form">
+            <field name="act_window_id" ref="act_open_account_auto_payment_cheque_view"/>
+            <field name="sequence" eval="20"/>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_account_auto_payment_form"/>
+        </record>
+
+        <menuitem id="menu_account_auto_payment_cheque"
+            parent="menu_account_auto_payment"
+            sequence="30"
+            action="act_open_account_auto_payment_cheque_view"/>
+
+    </data>
+</openerp>
