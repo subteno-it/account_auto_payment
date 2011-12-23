@@ -25,6 +25,9 @@
 from osv import osv
 from osv import fields
 import netsvc
+from StringIO import StringIO
+import base64
+from tools.translate import _
 
 
 class account_journal(osv.osv):
@@ -139,6 +142,7 @@ class account_move_line_group(osv.osv):
         'bank_journal_id': fields.many2one('account.journal', 'Bank journal', domain=[('type', '=', 'cash')], help="Journal where make the payment"),
         'account_move_line_ids': fields.one2many('account.move.line', 'account_move_line_group_id', 'Move Lines', ),
         'state': fields.selection([('draft','Draft'), ('done', 'Done')], 'State', help="Use by workflow"),
+        'etebac': fields.binary('Etebac', help="ETEBAC file"),
     }
 
     _defaults = {
@@ -193,12 +197,20 @@ class account_move_line_group(osv.osv):
                     account_move[line.account_id.id] = [line.id]
                 else:
                     account_move[line.account_id.id].append(line.id)
-            #TODO uncomment me
-            #for account_id, move_ids in account_move.items():
-            #    account_journal_obj.make_auto_payment(cr, uid, this.journal_id, this.bank_journal_id, move_ids, this.payment_date, context=context)
 
-            #TODO uncomment me
-            #wf_service.trg_validate(uid, 'account.move.line.group', id, 'signal_done', cr)
+            for account_id, move_ids in account_move.items():
+                account_journal_obj.make_auto_payment(cr, uid, this.journal_id, this.bank_journal_id, move_ids, this.payment_date, context=context)
+
+            if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
+                buf = StringIO()
+                for date, move_ids in date_move.items():
+                    self.export_bank_transfert(cr, uid, this, buf, date, move_ids, context=context)
+
+                etebac = base64.encodestring(buf.getvalue())
+                buf.close()
+                this.write({'etebac': etebac}, context=context)
+
+            wf_service.trg_validate(uid, 'account.move.line.group', id, 'signal_done', cr)
         return True
 
     def name_get(self, cr, uid, ids, context=None):
@@ -209,6 +221,211 @@ class account_move_line_group(osv.osv):
         for read in reads:
             res.append(( read['id'], read['journal_id'][1] + "/" + read['payment_date']))
         return res
+
+    def export_bank_transfert(self, cr, uid, this, buf, date, line_ids, context=None):
+        """ select account.move.lines to export
+            @params etbac : browse on current wizard id
+        """
+        amount = 0.0
+        lines_obj = self.pool.get('account.move.line')
+        if this.journal_id.type == 'purchase':
+            self.etbac_format_move_emetteur(cr, uid, this, buf, '02', date, context=context)
+            for line in lines_obj.browse(cr, uid, line_ids, context=context):
+                amount += self.etbac_format_move_destinataire(cr, uid, line, this, buf, context=context)
+            self.etbac_format_move_total(cr, uid, this, buf, amount, '02', context=context)
+        elif this.journal_id.type == 'traite':
+            num = 2
+            self.etbac_format_move_emetteur_traite(cr, uid, this, buf, '60', date, context=context)
+            for line in lines_obj.browse(cr, uid, line_ids, context=context):
+                amount += self.etbac_format_move_destinataire_traite(cr, uid, line, this, buf, num, context=context)
+                num += 1
+            self.etbac_format_move_total_traite(cr, uid, this, buf, amount, '60', num, context=context)
+
+
+    def etbac_format_move_emetteur(self, cr, uid, etbac, buf, mode, date, context=None):
+        """ Create 'emetteur' segment of ETBAC French Format for record type 03
+        """
+        user = self.pool.get('res.users').browse(cr, uid, uid, context=context)
+        rib = user.company_id.partner_id.bank_ids and user.company_id.partner_id.bank_ids[0] or False
+        if not rib:
+            raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % user.company_id.name)
+        if not rib.guichet or not rib.compte or not rib.banque:
+            raise osv.except_osv(_('Erreur'), _('Informations RIB manquantes !'))
+        A = '03'
+        B1 = mode
+        B2 = ' ' * 8
+        B3 = ' ' * 6  #emeteur
+        C1_1 = ' '
+        C1_2 = ' ' * 6
+        C1_3 = str(date[8:10] + date[5:7] + date[3]).ljust(5)
+        C2 = user.company_id.name.encode('ascii', 'replace').ljust(24).upper()
+        D1_1 = ' ' * 7
+        D1_2 = ' ' * 17
+        D2_1 = ' ' * 2
+        D2_2 = 'E'
+        D2_3 = ' ' * 5
+        D3 = str(rib.guichet).ljust(5).upper()
+        D4 = str(rib.compte).ljust(11).upper()
+        E = ' ' * 16
+        F = ' ' * 31
+        G1 = str(rib.banque).ljust(5).upper()
+        G2 = ' ' * 6
+        str_etbac = A + B1 + B2 + B3 + C1_1 + C1_2 + C1_3 + C2 + D1_1 + D1_2 + D2_1 + D2_2 + D2_3 + D3 + D4 + E + F + G1 + G2
+        if len(str_etbac) != 160:
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+        buf.write(str(str_etbac) + '\n')
+
+    def etbac_format_move_emetteur_traite(self, cr, uid, etbac, buf, mode, date, context=None):
+        """ Create 'emetteur' segment of ETBAC French Format for record type 03
+        """
+        user = self.pool.get('res.users').browse(cr, uid, uid, context=context)
+        rib = user.company_id.partner_id.bank_ids and user.company_id.partner_id.bank_ids[0] or False
+        if not rib:
+            raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % user.company_id.name)
+        if not rib.guichet or not rib.compte or not rib.banque:
+            raise osv.except_osv(_('Erreur'), _('Informations RIB manquantes !'))
+        A = '03'
+        B1 = mode
+        B2 = '00000001'
+        B3 = ' ' * 6  #emeteur
+        C1 = ' ' * 6
+        C2 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
+        C3 = user.company_id.name.encode('ascii', 'replace').ljust(24).upper()
+        D1 = ' ' * 24
+        D2_1 = '3'
+        D2_2 = ' '
+        D2_3 = 'E'
+        D3 = str(rib.banque).ljust(5).upper()
+        D4 = str(rib.guichet).ljust(5).upper()
+        D5 = str(rib.compte).ljust(11).upper()
+        E = ' ' * 16
+        F1 = ' ' * 6
+        F2 = ' ' * 10
+        F3 = ' ' * 15
+        G = ' ' * 11
+        str_etbac = A + B1 + B2 + B3 + C1 + C2 + C3 + D1 + D2_1 + D2_2 + D2_3 + D3 + D4 + D5 + E + F1 + F2 + F3 + G
+        if len(str_etbac) != 160:
+            print 'titi', len(str_etbac)
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+        buf.write(str(str_etbac) + '\n')
+
+    def etbac_format_move_destinataire(self, cr, uid, line, etbac, buf, context=None):
+        """ Create 'destinataire' segment of ETBAC French Format.
+            @params P (string) :
+            @return (string)
+        """
+        bank = line.partner_id.bank_ids and line.partner_id.bank_ids[0] or False
+        if not bank:
+            raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
+        A = '06'
+        B1 = line.move_type_id and line.move_type_id.code or '02'
+        B2 = ' ' * 8
+        B3 = ' ' * 6
+        C1 = str(line.ref or ' ').ljust(12).upper()
+        C2 = str(line.partner_id.name).ljust(24).upper()
+        D1 = str(bank.bank and bank.bank.name or bank.name).ljust(24).upper()
+        D2 = ' ' * 8
+        D3 = str(bank.guichet).ljust(5).upper()
+        D4 = str(bank.compte).ljust(11).upper()
+        E = str(int(float('%.2f' % line.debit) * 100)).zfill(16)
+        F = str(line.name or ' ').ljust(31).upper()
+        G1 = str(bank.banque).ljust(5).upper()
+        G2 = ' ' * 6
+        str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2 + D3 + D4 + E + F + G1 + G2
+        if len(str_etbac) != 160:
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+        buf.write(str(str_etbac) + '\n')
+        return line.debit
+
+    def etbac_format_move_destinataire_traite(self, cr, uid, line, etbac, buf, num, context=None):
+        """ Create 'destinataire' segment of ETBAC French Format.
+            @params P (string) :
+            @return (string)
+        """
+        bank = line.partner_id.bank_ids and line.partner_id.bank_ids[0] or False
+        if not bank:
+            raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
+        A = '06'
+        B1 = line.move_type_id and line.move_type_id.code or '60'
+        B2 = str(num).ljust(8, '0').upper()
+        B3 = ' ' * 6
+        C1_1 = ' ' * 2
+        C1_2 = str(line.ref or ' ').ljust(10).upper()
+        C2 = str(line.partner_id.name).ljust(24).upper()
+        D1 = str(bank.bank and bank.bank.name or bank.name).ljust(24).upper()
+        D2_1 = line.move_type_id and line.move_type_id.traite_code
+        D2_2 = ' ' * 2
+        D3 = str(bank.banque).ljust(5).upper()
+        D4 = str(bank.guichet).ljust(5).upper()
+        D5 = str(bank.compte).ljust(11).upper()
+        E1 = str(int(float('%.2f' % line.debit) * 100)).zfill(12)
+        E2 = ' ' * 4
+        date = line.date_maturity
+        F1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
+        date = etbac.payment_date
+        F2_1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
+        F2_2 = ' ' * 4
+        F3_1 = ' ' * 1
+        F3_2 = ' ' * 3
+        F3_3 = ' ' * 3
+        F3_4 = ' ' * 9
+        G = ' ' * 10
+        str_etbac = A + B1 + B2 + B3 + C1_1 + C1_2 + C2 + D1 + D2_1 + D2_2 + D3 + D4 + D5 + E1 + E2 + F1 + F2_1 + F2_2 + F3_1 + F3_2 + F3_3 + F3_4 + G
+        if len(str_etbac) != 160:
+            print 'toto', len(str_etbac)
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+        buf.write(str(str_etbac) + '\n')
+        return line.debit
+
+    def etbac_format_move_total(self, cr, uid, etbac, buf, montant, mode, context=None):
+        """ Create 'total' segment of ETBAC French Format.
+        """
+        A = '08'
+        B1 = mode
+        B2 = ' ' * 8
+        B3 = ' ' * 6
+        C1 = ' ' * 12
+        C2 = ' ' * 24
+        D1 = ' ' * 24
+        D2 = ' ' * 8
+        D3 = ' ' * 5
+        D4 = ' ' * 11
+        E = str(int(float('%.2f' % montant) * 100)).zfill(16)
+        F = ' ' * 31
+        G1 = ' ' * 5
+        G2 = ' ' * 6
+        str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2 + D3 + D4 + E + F + G1 + G2
+        if len(str_etbac) != 160:
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+        buf.write(str(str_etbac) + '\n')
+
+    def etbac_format_move_total_traite(self, cr, uid, etbac, buf, montant, mode, num, context=None):
+        """ Create 'total' segment of ETBAC French Format.
+        """
+        A = '08'
+        B1 = mode
+        B2 = str(num).ljust(8, '0').upper()
+        B3 = ' ' * 6
+        C1 = ' ' * 12
+        C2 = ' ' * 24
+        D1 = ' ' * 24
+        D2_1 = ' ' * 1
+        D2_2 = ' ' * 2
+        D3 = ' ' * 5
+        D4 = ' ' * 5
+        D5 = ' ' * 11
+        E1 = str(int(float('%.2f' % montant) * 100)).zfill(12)
+        E2 = ' ' * 4
+        F1 = ' ' * 6
+        F2 = ' ' * 10
+        F3 = ' ' * 15
+        G1 = ' ' * 5
+        G2 = ' ' * 6
+        str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2_1 + D2_2 + D3 + D4 + D5 + E1 + E2 + F1 + F2 + F3 + G1 + G2
+        if len(str_etbac) != 160:
+            print 'tata', len(str_etbac)
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+        buf.write(str(str_etbac) + '\n')
 
 account_move_line_group()
 

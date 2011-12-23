@@ -163,6 +163,7 @@
                     <field name="journal_id" invisible="1"/>
                     <field name="account_move_line_ids" colspan="4" nolabel="1"/>
                     <button string="Validate" states="draft" type="object" name="button_done"/>
+                    <field name="etebac" attrs="{'readonly': [('states', '!=', 'done')]}"/>
                 </form>
             </field>
         </record>
