@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+    <data>
+        ##############################################################################
+        #
+        #    account_auto_payment module for OpenERP, add wizard to make the payment auto
+        #    Copyright (C) 2011 SYLEAM Info Services ([http://www.syleam.fr/]) 
+        #              Jean-Sébastien SUZANNE [jean-sebastien.suzanne@syleam.fr]
+        #
+        #    This file is a part of account_auto_payment
+        #
+        #    account_auto_payment is free software: you can redistribute it and/or modify
+        #    it under the terms of the GNU General Public License as published by
+        #    the Free Software Foundation, either version 3 of the License, or
+        #    (at your option) any later version.
+        #
+        #    account_auto_payment is distributed in the hope that it will be useful,
+        #    but WITHOUT ANY WARRANTY; without even the implied warranty of
+        #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        #    GNU General Public License for more details.
+        #
+        #    You should have received a copy of the GNU General Public License
+        #    along with this program.  If not, see [http://www.gnu.org/licenses/].
+        #
+        ##############################################################################
+
+
+        <record id="view_account_journal_form" model="ir.ui.view">
+            <field name="name">account.journal.form</field>
+            <field name="model">account.journal</field>
+            <field name="type">form</field>
+            <field name="priority" eval="16"/>
+            <field name="inherit_id" ref="account.view_account_journal_form"/>
+            <field name="arch" type="xml">
+                <data>
+                    <xpath expr="//field[@name='default_debit_account_id']" position="replace">
+                        <field name="default_debit_account_id" attrs="{'required':[('type', 'in',['cash', 'traite', 'cheque'])]}" domain="[('type','&lt;&gt;','view'),('type','&lt;&gt;','consolidation')]"/>
+                    </xpath>
+                    <xpath expr="//field[@name='default_credit_account_id']" position="replace">
+                        <field name="default_credit_account_id" attrs="{'required':[('type', 'in', ['cash', 'traite', 'cheque'])]}" domain="[('type','&lt;&gt;','view'),('type','&lt;&gt;','consolidation')]"/>
+                    </xpath>
+                    <xpath expr="//field[@name='entry_posted']" position="after">
+                        <field name="required_fields"/>
+                        <field name="make_etebac"/>
+                    </xpath>
+                </data>
+            </field>
+        </record>
+
+        <record id="view_account_move_type_tree" model="ir.ui.view">
+            <field name="name">account.move.type.tree</field>
+            <field name="model">account.move.type</field>
+            <field name="type">tree</field>
+            <field name="priority" eval="8"/>
+            <field name="arch" type="xml">
+                <tree string="Account Moves Type">
+                    <field name="name"/>
+                    <field name="type"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="view_account_move_type_form" model="ir.ui.view">
+            <field name="name">account.move.type.form</field>
+            <field name="model">account.move.type</field>
+            <field name="type">form</field>
+            <field name="priority" eval="8"/>
+            <field name="arch" type="xml">
+                <form string="Account Moves Type">
+                    <field name="name" select="1"/>
+                    <field name="code" select="1"/>
+                    <group colspan="2" col="2">
+                        <separator string="Type of journal" colspan="4"/>
+                        <field name="type" select="1"/>
+                        <group colspan="2"  col="2" attrs="{'invisible': [('type', '!=', 'traite')]}">
+                            <field name="traite_code" select="2" attrs="{'required': [('type', '=', 'traite')]}"/>
+                        </group>
+                    </group>
+                    <group colspan="2" col="2">
+                        <separator string="Account parent for payment" colspan="4"/>
+                        <field name="account" select="1"/>
+                        <group colspan="2"  col="2" attrs="{'invisible': [('account', '!=', 'custom')]}">
+                            <field name="account_id" select="2" attrs="{'required': [('account', '=', 'custom')]}" domain="[('type','=','view')]"/>
+                        </group>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="act_open_account_move_type_view">
+            <field name="name">Account Moves Type</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">account.move.type</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+            <field name="context">{}</field>
+        </record>
+
+        <record model="ir.actions.act_window.view" id="act_open_account_move_type_view_form">
+            <field name="act_window_id" ref="act_open_account_move_type_view"/>
+            <field name="sequence" eval="20"/>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_account_move_type_form"/>
+        </record>
+
+        <record model="ir.actions.act_window.view" id="act_open_account_move_type_view_tree">
+            <field name="act_window_id" ref="act_open_account_move_type_view"/>
+            <field name="sequence" eval="10"/>
+            <field name="view_mode">tree</field>
+            <field name="view_id" ref="view_account_move_type_tree"/>
+        </record>
+
+        <menuitem id="menu_account_move_type"
+            parent="account.menu_finance_accounting"
+            sequence="20"
+            action="act_open_account_move_type_view"/>
+
+        <record id="view_account_move_line_form" model="ir.ui.view">
+            <field name="name">account.move.line.form</field>
+            <field name="model">account.move.line</field>
+            <field name="type">form</field>
+            <field name="priority" eval="16"/>
+            <field name="inherit_id" ref="account.view_move_line_form"/>
+            <field name="arch" type="xml">
+                <data>
+                    <xpath expr="//field[@name='journal_id']" position="replace">
+                        <field name="journal_id" readonly="False" select="1" on_change="onchange_journal_id(journal_id)"/>
+                        <field name="journal_type" invisible="1" />
+                        <field name="journal_required_fields" invisible="1" />
+                        <field name="move_type_id" domain="[('type', '=', journal_type)]" attrs="{'required': [('journal_required_fields', '=', True)]}"/>
+                    </xpath>
+                    <xpath expr="//field[@name='partner_id']" position="replace">
+                        <field name="partner_id" select="1" on_change="onchange_partner_id(False,partner_id,account_id,debit,credit,date)" attrs="{'required': [('journal_required_fields', '=', True)]}"/>
+                    </xpath>
+                    <xpath expr="//field[@name='date_maturity']" position="replace">
+                        <field name="date_maturity" attrs="{'required': [('journal_required_fields', '=', True)]}"/>
+                    </xpath>
+                </data>
+            </field>
+        </record>
+
+        <record id="view_account_journal_view_form" model="ir.ui.view">
+            <field name="name">account.journal.view.form</field>
+            <field name="model">account.journal.view</field>
+            <field name="type">form</field>
+            <field name="priority" eval="16"/>
+            <field name="inherit_id" ref="account.view_account_journal_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='name']" position="after">
+                    <field name="color" colspan="4"/>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</openerp>

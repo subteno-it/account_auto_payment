@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #    account_auto_payment module for OpenERP, add wizard to make the payment auto
-#    Copyright (C) 2011 SYLEAM Info Services (<http://www.syleam.fr/>) 
+#    Copyright (C) 2011 SYLEAM Info Services (<http://www.syleam.fr/>)
 #              Jean-Sébastien SUZANNE <jean-sebastien.suzanne@syleam.fr>
 #
 #    This file is a part of account_auto_payment
@@ -29,14 +29,19 @@
     'description': """add wizard to make the payment auto""",
     'author': 'SYLEAM Info Services',
     'website': 'http://www.syleam.fr/',
-    'depends': [],
+    'depends': [
+        'account',
+        'base',
+    ],
     'init_xml': [],
     'update_xml': [
         #'security/groups.xml',
         #'security/ir.model.access.csv',
         #'view/menu.xml',
+        'view/account_view.xml',
         #'wizard/wizard.xml',
         #'report/report.xml',
+        'data/account_move_type.xml',
     ],
     'demo_xml': [],
     'installable': True,
