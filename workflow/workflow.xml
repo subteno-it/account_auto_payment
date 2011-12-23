@@ -1,29 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <openerp>
     <data>
-##############################################################################
-#
-#    account_auto_payment module for OpenERP, add wizard to make the payment auto
-#    Copyright (C) 2011 SYLEAM Info Services ([http://www.syleam.fr/]) 
-#              Jean-Sébastien SUZANNE [jean-sebastien.suzanne@syleam.fr]
-#
-#    This file is a part of account_auto_payment
-#
-#    account_auto_payment is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
-#
-#    account_auto_payment is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#    along with this program.  If not, see [http://www.gnu.org/licenses/].
-#
-##############################################################################
+        ##############################################################################
+        #
+        #    account_auto_payment module for OpenERP, add wizard to make the payment auto
+        #    Copyright (C) 2011 SYLEAM Info Services ([http://www.syleam.fr/]) 
+        #              Jean-Sébastien SUZANNE [jean-sebastien.suzanne@syleam.fr]
+        #
+        #    This file is a part of account_auto_payment
+        #
+        #    account_auto_payment is free software: you can redistribute it and/or modify
+        #    it under the terms of the GNU General Public License as published by
+        #    the Free Software Foundation, either version 3 of the License, or
+        #    (at your option) any later version.
+        #
+        #    account_auto_payment is distributed in the hope that it will be useful,
+        #    but WITHOUT ANY WARRANTY; without even the implied warranty of
+        #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        #    GNU General Public License for more details.
+        #
+        #    You should have received a copy of the GNU General Public License
+        #    along with this program.  If not, see [http://www.gnu.org/licenses/].
+        #
+        ##############################################################################
 
-
+        <record model="workflow" id="workflow_auto_payment">
+            <field name="activities"/>
+            <field name="name">Account move line group</field>
+            <field name="on_create" eval="1"/>
+            <field name="osv">account.move.line.group</field>
+        </record>
+        <record model="workflow.activity" id="workflow_activity_auto_payment_draft">
+            <field name="flow_start" eval="True"/>
+            <field name="join_mode">XOR</field>
+            <field name="kind">dummy</field>
+            <field name="name">draft</field>
+            <field name="split_mode">XOR</field>
+            <field name="wkf_id" ref="workflow_auto_payment"/>
+        </record>
+        <record model="workflow.activity" id="workflow_activity_auto_payment_done">
+            <field name="flow_stop" eval="True"/>
+            <field name="join_mode">XOR</field>
+            <field name="kind">function</field>
+            <field name="action">write({'state': 'done'})</field>
+            <field name="name">done</field>
+            <field name="split_mode">XOR</field>
+            <field name="wkf_id" ref="workflow_auto_payment"/>
+        </record>
+        <record model="workflow.transition" id="workflow_transition_draft_2_done">
+            <field name="act_from" ref="workflow_activity_auto_payment_draft"/>
+            <field name="act_to" ref="workflow_activity_auto_payment_done"/>
+            <field name="condition">True</field>
+            <field name="signal">signal_done</field>
+        </record>
     </data>
 </openerp>
+

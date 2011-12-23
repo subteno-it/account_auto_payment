@@ -43,6 +43,7 @@
         'wizard/account_auto_payment.xml',
         #'report/report.xml',
         'data/account_move_type.xml',
+        'workflow/workflow.xml',
     ],
     'demo_xml': [],
     'installable': True,

@@ -24,6 +24,7 @@
 
 from osv import osv
 from osv import fields
+import netsvc
 
 
 class account_journal(osv.osv):
@@ -175,6 +176,7 @@ class account_move_line_group(osv.osv):
 
     def button_done(self, cr, uid, ids, context):
         account_journal_obj = self.pool.get('account.journal')
+        wf_service = netsvc.LocalService("workflow")
         for this in self.browse(cr, uid, ids, context=context):
             account_move = {}
             date_move = {}
@@ -191,10 +193,12 @@ class account_move_line_group(osv.osv):
                     account_move[line.account_id.id] = [line.id]
                 else:
                     account_move[line.account_id.id].append(line.id)
+            #TODO uncomment me
+            #for account_id, move_ids in account_move.items():
+            #    account_journal_obj.make_auto_payment(cr, uid, this.journal_id, this.bank_journal_id, move_ids, this.payment_date, context=context)
 
-            for account_id, move_ids in account_move.items():
-                account_journal_obj.make_auto_payment(cr, uid, this.journal_id, this.bank_journal_id, move_ids, this.payment_date, context=context)
-
+            #TODO uncomment me
+            #wf_service.trg_validate(uid, 'account.move.line.group', id, 'signal_done', cr)
         return True
 
     def name_get(self, cr, uid, ids, context=None):
