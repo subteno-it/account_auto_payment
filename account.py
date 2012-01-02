@@ -68,6 +68,8 @@ class account_journal(osv.osv):
         debit = 0
         credit = 0
         period_id = account_period_obj.find(cr, uid, payment_date, context=context)[0]
+        reconcile = []
+        move_id = self.pool.get('account.move').create(cr, uid, {'date': payment_date, 'journal_id': bank_journal.id, 'period_id':period_id}, context=ctx)
         for move in account_move_line_obj.read(cr, uid, move_ids, ['credit', 'debit'], context=context):
             debit += move['debit']
             credit += move['credit']
@@ -77,14 +79,13 @@ class account_journal(osv.osv):
                 'credit': move['debit'],
                 'period_id': period_id,
                 'move_type_id': False,
-                'move_id': False,
+                'move_id': move_id,
                 'journal_type': 'cash',
                 'journal_required_fields': False,
                 'account_move_line_group_id': False,
                 'select_to_payment': False,
             }
-            bank_line_id = account_move_line_obj.copy(cr, uid, move['id'], vals, context=ctx)
-            account_move_line_obj.reconcile(cr, uid, [move['id'], bank_line_id], context=context)
+            reconcile.append([move['id'], account_move_line_obj.copy(cr, uid, move['id'], vals, context=ctx)])
 
         account_id = journal.type == 'purchase' and bank_journal.default_credit_account_id.id or bank_journal.default_debit_account_id.id
         vals = {
@@ -95,13 +96,16 @@ class account_journal(osv.osv):
             'period_id': period_id,
             'move_type_id': False,
             'account_id': account_id,
-            'move_id': False,
+            'move_id': move_id,
             'journal_type': 'cash',
             'journal_required_fields': False,
             'account_move_line_group_id': False,
             'select_to_payment': False,
         }
         account_move_line_obj.create(cr, uid, vals, context=ctx)
+
+        for line_ids in reconcile:
+            account_move_line_obj.reconcile(cr, uid, line_ids, context=context)
 
 account_journal()
 
@@ -210,7 +214,7 @@ class account_move_line_group(osv.osv):
                 buf.close()
                 this.write({'etebac': etebac}, context=context)
 
-            wf_service.trg_validate(uid, 'account.move.line.group', id, 'signal_done', cr)
+            wf_service.trg_validate(uid, 'account.move.line.group', this.id, 'signal_done', cr)
         return True
 
     def name_get(self, cr, uid, ids, context=None):
