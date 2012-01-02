@@ -305,7 +305,6 @@ class account_move_line_group(osv.osv):
         G = ' ' * 11
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + C3 + D1 + D2_1 + D2_2 + D2_3 + D3 + D4 + D5 + E + F1 + F2 + F3 + G
         if len(str_etbac) != 160:
-            print 'titi', len(str_etbac)
             raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
         buf.write(str(str_etbac) + '\n')
 
@@ -372,7 +371,6 @@ class account_move_line_group(osv.osv):
         G = ' ' * 10
         str_etbac = A + B1 + B2 + B3 + C1_1 + C1_2 + C2 + D1 + D2_1 + D2_2 + D3 + D4 + D5 + E1 + E2 + F1 + F2_1 + F2_2 + F3_1 + F3_2 + F3_3 + F3_4 + G
         if len(str_etbac) != 160:
-            print 'toto', len(str_etbac)
             raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
         buf.write(str(str_etbac) + '\n')
         return line.debit
@@ -423,7 +421,6 @@ class account_move_line_group(osv.osv):
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2_1 + D2_2 + D3 + D4 + D5 + E1 + E2 + F1 + F2 + F3 + G1 + G2
         if len(str_etbac) != 160:
-            print 'tata', len(str_etbac)
             raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
         buf.write(str(str_etbac) + '\n')
 
@@ -435,7 +432,8 @@ class account_move_line(osv.osv):
 
     _columns = {
         'journal_type': fields.selection([('sale', 'Sale'), ('purchase', 'Purchase'), ('cash', 'Cash'), ('general', 'General'), ('situation', 'Situation'), ('traite', 'Traite'), ('cheque', 'Cheque')], 'Display type', required=True, help="View only in the moves in this journal type"),
-        'journal_required_fields': fields.boolean('Required fields', help="If check, the fields Partner, Maturity date and move type will be required"),
+        'journal_required_fields': fields.boolean('Journal required fields', help="If check and account required field check, the fields Partner, Maturity date and move type will be required"),
+        'account_required_fields': fields.boolean('Account required fields', help="If check, the fields Partner, Maturity date and move type will be required"),
         'move_type_id': fields.many2one('account.move.type', 'Type', help="type of payment"),
         'account_move_line_group_id': fields.many2one('account.move.line.group', 'Group of line', help="All the line with this group have send in the same bank as the same time"),
         'select_to_payment': fields.boolean('Select', help="If check, the move will be paid"),
@@ -494,6 +492,8 @@ class account_move_line(osv.osv):
             fields_name = [field.field for field in journal.view_id.columns_id]
             if 'journal_id' not in fields_list:
                 fields_list.append(('journal_id', False))
+            if 'account_required_fields' not in fields_list:
+                fields_list.append(('account_required_fields', False))
             if 'journal_required_fields' not in fields_list:
                 fields_list.append(('journal_required_fields', False))
             if 'journal_type' not in fields_list:
@@ -542,20 +542,37 @@ class account_move_line(osv.osv):
                     fields.append(field)
                     if field == 'journal_id':
                         xml += '''<field name="journal_id" on_change="onchange_journal_id(journal_id)" invisible="1"/>\n'''
-                    if field == 'journal_required_fields':
+                    elif field == 'journal_required_fields':
                         xml += '''<field name="journal_required_fields" invisible="1"/>\n'''
-                    if field == 'journal_id':
+                    elif field == 'account_required_fields':
+                        xml += '''<field name="account_required_fields" invisible="1"/>\n'''
+                    elif field == 'journal_id':
                         xml += '''<field name="journal_type" invisible="1"/>\n'''
-                    if field == 'move_type_id':
+                    elif field == 'move_type_id':
                         if context.get('display_select', False):
                             xml += '''<field name="move_type_id" readonly="1"/>'''
                         else:
-                            xml += '''<field name="move_type_id" domain="[('type', '=', journal_type)]" attrs="{'required': [('journal_required_fields', '=', True)]}"/>'''
+                            xml += '''<field name="move_type_id" domain="[('type', '=', journal_type)]" attrs="{'required': [('journal_required_fields', '=', True), ('account_required_fields', '=', True)]}"/>'''
 
             xml += '''</tree>'''
             result['arch'] = xml
             result['fields'] = self.fields_get(cr, uid, fields, context)
         return result
+
+    def onchange_account_id(self, cr, uid, ids, account_id=False, partner_id=False):
+        res = super(account_move_line, self).onchange_account_id(cr, uid, ids, account_id=account_id, partner_id=partner_id)
+        if account_id:
+            account = self.pool.get('account.account').browse(cr, uid, account_id)
+            res['value']['account_required_fields'] = account.user_type.required_fields
+        return res
+
+    def onchange_partner_id(self, cr, uid, ids, move_id, partner_id, account_id=None, debit=0, credit=0, date=False, journal=False):
+        values = super(account_move_line, self).onchange_partner_id(cr, uid, ids, move_id, partner_id, account_id=account_id, debit=debit, credit=credit, date=date, journal=journal)
+        if values['value'].get('account_id', None) is not None:
+            account = self.pool.get('account.account').browse(cr, uid, values['value'].get('account_id'))
+            values['value']['account_required_fields'] = account.user_type.required_fields
+
+        return values
 
 account_move_line()
 
@@ -572,6 +589,20 @@ class account_journal_view(osv.osv):
     }
 
 account_journal_view()
+
+
+class account_account_type(osv.osv):
+    _inherit = 'account.account.type'
+
+    _columns = {
+        'required_fields': fields.boolean('Required fields', help="If check, the fields Partner, Maturity date and move type will be required"),
+    }
+
+    _defaults = {
+         'required_fields': lambda *a: False,
+    }
+
+account_account_type()
 
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:
