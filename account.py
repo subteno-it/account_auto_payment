@@ -431,7 +431,7 @@ class account_move_line(osv.osv):
     _inherit = 'account.move.line'
 
     _columns = {
-        'journal_type': fields.selection([('sale', 'Sale'), ('purchase', 'Purchase'), ('cash', 'Cash'), ('general', 'General'), ('situation', 'Situation'), ('traite', 'Traite'), ('cheque', 'Cheque')], 'Display type', required=True, help="View only in the moves in this journal type"),
+        'journal_type': fields.selection([('sale', 'Sale'), ('purchase', 'Purchase'), ('cash', 'Cash'), ('general', 'General'), ('situation', 'Situation'), ('traite', 'Traite'), ('cheque', 'Cheque')], 'Display type', help="View only in the moves in this journal type"),
         'journal_required_fields': fields.boolean('Journal required fields', help="If check and account required field check, the fields Partner, Maturity date and move type will be required"),
         'account_required_fields': fields.boolean('Account required fields', help="If check, the fields Partner, Maturity date and move type will be required"),
         'move_type_id': fields.many2one('account.move.type', 'Type', help="type of payment"),
@@ -604,5 +604,14 @@ class account_account_type(osv.osv):
 
 account_account_type()
 
+
+class account_model_line(osv.osv):
+    _inherit = 'account.model.line'
+
+    _columns = {
+        'move_type_id': fields.many2one('account.move.type', 'Type', help="type of payment"),
+    }
+
+account_model_line()
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:
