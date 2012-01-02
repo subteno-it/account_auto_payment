@@ -441,6 +441,10 @@ class account_move_line(osv.osv):
         'select_to_payment': fields.boolean('Select', help="If check, the move will be paid"),
     }
 
+    _defaults = {
+         'journal_type': lambda *a: 'cash',
+    }
+
     def get_select_to_payment(self, cr, uid, ids, context=None):
         res = {}
         for id in ids:
