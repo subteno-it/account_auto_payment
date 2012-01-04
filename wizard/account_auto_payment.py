@@ -57,7 +57,7 @@ class account_auto_payment(osv.osv_memory):
                 account_id = type.account_id.id
                 account_op = 'child_of'
 
-            if account_id not in account_ids:
+            if account_id and account_id not in account_ids:
                 account_ids.append(account_id)
 
         domain = [

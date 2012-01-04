@@ -48,7 +48,7 @@
         <record model="account.move.type" id="account_move_type_4">
             <field name="account">debit</field>
             <field name="code">00</field>
-            <field name="name">Cheque</field>
+            <field name="name">cheque</field>
             <field name="type">cheque</field>
         </record>
         <record model="account.move.type" id="account_move_type_5">
@@ -56,6 +56,12 @@
             <field name="account_id" search="[('code', 'like', '401%'), ('type', '=', 'view')]"/>
             <field name="code">02</field>
             <field name="name">Virement</field>
+            <field name="type">purchase</field>
+        </record>
+        <record model="account.move.type" id="account_move_type_6">
+            <field name="account">debit</field>
+            <field name="code">00</field>
+            <field name="name">cheque</field>
             <field name="type">purchase</field>
         </record>
     </data>

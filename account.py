@@ -74,6 +74,7 @@ class account_journal(osv.osv):
             debit += move['debit']
             credit += move['credit']
             vals = {
+		'date': payment_date,
                 'journal_id': bank_journal.id,
                 'debit': move['credit'],
                 'credit': move['debit'],
@@ -89,6 +90,7 @@ class account_journal(osv.osv):
 
         account_id = journal.type == 'purchase' and bank_journal.default_credit_account_id.id or bank_journal.default_debit_account_id.id
         vals = {
+	    'date': payment_date,
             'name': bank_journal.name,
             'journal_id': bank_journal.id,
             'debit': debit,
@@ -256,13 +258,13 @@ class account_move_line_group(osv.osv):
         if not rib.guichet or not rib.compte or not rib.banque:
             raise osv.except_osv(_('Erreur'), _('Informations RIB manquantes !'))
         A = '03'
-        B1 = mode
+        B1 = mode.ljust(2)
         B2 = ' ' * 8
         B3 = ' ' * 6  #emeteur
         C1_1 = ' '
         C1_2 = ' ' * 6
         C1_3 = str(date[8:10] + date[5:7] + date[3]).ljust(5)
-        C2 = user.company_id.name.encode('ascii', 'replace').ljust(24).upper()
+        C2 = user.company_id.name.encode('ascii', 'replace')[:24].ljust(24).upper()
         D1_1 = ' ' * 7
         D1_2 = ' ' * 17
         D2_1 = ' ' * 2
@@ -276,7 +278,7 @@ class account_move_line_group(osv.osv):
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1_1 + C1_2 + C1_3 + C2 + D1_1 + D1_2 + D2_1 + D2_2 + D2_3 + D3 + D4 + E + F + G1 + G2
         if len(str_etbac) != 160:
-            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n emetteur %s ') % len(str_etbac))
         buf.write(str(str_etbac) + '\n')
 
     def etbac_format_move_emetteur_traite(self, cr, uid, etbac, buf, mode, date, context=None):
@@ -289,12 +291,12 @@ class account_move_line_group(osv.osv):
         if not rib.guichet or not rib.compte or not rib.banque:
             raise osv.except_osv(_('Erreur'), _('Informations RIB manquantes !'))
         A = '03'
-        B1 = mode
+        B1 = mode.ljust(2)
         B2 = '00000001'
         B3 = ' ' * 6  #emeteur
         C1 = ' ' * 6
         C2 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
-        C3 = user.company_id.name.encode('ascii', 'replace').ljust(24).upper()
+        C3 = user.company_id.name.encode('ascii', 'replace')[:24].ljust(24).upper()
         D1 = ' ' * 24
         D2_1 = '3'
         D2_2 = ' '
@@ -309,7 +311,7 @@ class account_move_line_group(osv.osv):
         G = ' ' * 11
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + C3 + D1 + D2_1 + D2_2 + D2_3 + D3 + D4 + D5 + E + F1 + F2 + F3 + G
         if len(str_etbac) != 160:
-            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n emetteur traite %s') % len(str_etbac))
         buf.write(str(str_etbac) + '\n')
 
     def etbac_format_move_destinataire(self, cr, uid, line, etbac, buf, context=None):
@@ -321,22 +323,22 @@ class account_move_line_group(osv.osv):
         if not bank:
             raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
         A = '06'
-        B1 = line.move_type_id and line.move_type_id.code or '02'
+        B1 = line.move_type_id and line.move_type_id.code.ljust(2) or '02'
         B2 = ' ' * 8
         B3 = ' ' * 6
         C1 = str(line.ref or ' ').ljust(12).upper()
-        C2 = str(line.partner_id.name).ljust(24).upper()
-        D1 = str(bank.bank and bank.bank.name or bank.name).ljust(24).upper()
+        C2 = str(line.partner_id.name).ljust(24)[:24].upper()
+        D1 = str(bank.bank and bank.bank.name or bank.name)[:24].ljust(24).upper()
         D2 = ' ' * 8
         D3 = str(bank.guichet).ljust(5).upper()
         D4 = str(bank.compte).ljust(11).upper()
         E = str(int(float('%.2f' % line.debit) * 100)).zfill(16)
-        F = str(line.name or ' ').ljust(31).upper()
+        F = str(line.name or ' ')[:31].ljust(31).upper()
         G1 = str(bank.banque).ljust(5).upper()
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2 + D3 + D4 + E + F + G1 + G2
         if len(str_etbac) != 160:
-            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire %s') % len(str_etbac))
         buf.write(str(str_etbac) + '\n')
         return line.debit
 
@@ -349,14 +351,14 @@ class account_move_line_group(osv.osv):
         if not bank:
             raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
         A = '06'
-        B1 = line.move_type_id and line.move_type_id.code or '60'
-        B2 = str(num).ljust(8, '0').upper()
+        B1 = line.move_type_id and line.move_type_id.code.ljust(2) or '60'
+        B2 = str(num).rjust(8, '0').upper()
         B3 = ' ' * 6
         C1_1 = ' ' * 2
-        C1_2 = str(line.ref or ' ').ljust(10).upper()
-        C2 = str(line.partner_id.name).ljust(24).upper()
-        D1 = str(bank.bank and bank.bank.name or bank.name).ljust(24).upper()
-        D2_1 = line.move_type_id and line.move_type_id.traite_code
+        C1_2 = str(line.ref or ' ')[:10].ljust(10).upper()
+        C2 = str(line.partner_id.name)[:24].ljust(24).upper()
+        D1 = str(bank.bank and bank.bank.name or bank.name or ' ')[:24].ljust(24).upper()
+        D2_1 = line.move_type_id and line.move_type_id.traite_code.ljust(1) or '0'
         D2_2 = ' ' * 2
         D3 = str(bank.banque).ljust(5).upper()
         D4 = str(bank.guichet).ljust(5).upper()
@@ -375,7 +377,7 @@ class account_move_line_group(osv.osv):
         G = ' ' * 10
         str_etbac = A + B1 + B2 + B3 + C1_1 + C1_2 + C2 + D1 + D2_1 + D2_2 + D3 + D4 + D5 + E1 + E2 + F1 + F2_1 + F2_2 + F3_1 + F3_2 + F3_3 + F3_4 + G
         if len(str_etbac) != 160:
-            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire traite %s') % len(str_etbac))
         buf.write(str(str_etbac) + '\n')
         return line.debit
 
@@ -383,7 +385,7 @@ class account_move_line_group(osv.osv):
         """ Create 'total' segment of ETBAC French Format.
         """
         A = '08'
-        B1 = mode
+        B1 = mode.ljust(2)
         B2 = ' ' * 8
         B3 = ' ' * 6
         C1 = ' ' * 12
@@ -398,15 +400,15 @@ class account_move_line_group(osv.osv):
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2 + D3 + D4 + E + F + G1 + G2
         if len(str_etbac) != 160:
-            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n total : %s') % len(str_etbac))
         buf.write(str(str_etbac) + '\n')
 
     def etbac_format_move_total_traite(self, cr, uid, etbac, buf, montant, mode, num, context=None):
         """ Create 'total' segment of ETBAC French Format.
         """
         A = '08'
-        B1 = mode
-        B2 = str(num).ljust(8, '0').upper()
+        B1 = mode.ljust(2)
+        B2 = str(num).rjust(8, '0').upper()
         B3 = ' ' * 6
         C1 = ' ' * 12
         C2 = ' ' * 24
@@ -425,7 +427,7 @@ class account_move_line_group(osv.osv):
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2_1 + D2_2 + D3 + D4 + D5 + E1 + E2 + F1 + F2 + F3 + G1 + G2
         if len(str_etbac) != 160:
-            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !'))
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\ntotal traite %s') % len(str_etbac))
         buf.write(str(str_etbac) + '\n')
 
 account_move_line_group()
