@@ -94,7 +94,7 @@ class account_journal(osv.osv):
                     'account_move_line_group_id': False,
                     'select_to_payment': False,
                 }
-                reconcile.append([move['id'], account_move_line_obj.copy(cr, uid, move['id'], vals, context=ctx)])
+                reconcile.append([move.id, account_move_line_obj.copy(cr, uid, move.id, vals, context=ctx)])
 
         if journal.type == 'purchase':
             credit = credit - debit
