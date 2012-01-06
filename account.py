@@ -90,7 +90,6 @@ class account_journal(osv.osv):
                     'move_id': move_id,
                     'journal_type': 'cash',
                     'journal_required_fields': False,
-                    'account_id': account_id,
                     'account_move_line_group_id': False,
                     'select_to_payment': False,
                 }
