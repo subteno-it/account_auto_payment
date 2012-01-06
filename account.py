@@ -69,24 +69,41 @@ class account_journal(osv.osv):
         credit = 0
         period_id = account_period_obj.find(cr, uid, payment_date, context=context)[0]
         reconcile = []
+        account_id = False
+        for move in account_move_line_obj.browse(cr, uid, move_ids, context=ctx):
+            debit += move.debit
+            credit += move.credit
+            if not account_id:
+                if move.move_type_id.account == 'debit':
+                    account_id = journal.default_debit_account_id and journal.default_debit_account_id.id or False
+                elif move.move_type_id.account == 'credit':
+                    account_id = journal.default_credit_account_id and journal.default_credit_account_id.id or False
+                elif move.move_type_id.account == 'custom':
+                    account_id = move.move_type_id.account_id.id
+
+        if journal.type == 'purchase':
+            credit = credit - debit
+            debit = 0
+        elif journal.type in ('traite', 'cheque'):
+            debit = debit - credit
+            credit = 0
+
         move_id = self.pool.get('account.move').create(cr, uid, {'date': payment_date, 'journal_id': bank_journal.id, 'period_id':period_id}, context=ctx)
-        for move in account_move_line_obj.read(cr, uid, move_ids, ['credit', 'debit'], context=context):
-            debit += move['debit']
-            credit += move['credit']
-            vals = {
-		'date': payment_date,
-                'journal_id': bank_journal.id,
-                'debit': move['credit'],
-                'credit': move['debit'],
-                'period_id': period_id,
-                'move_type_id': False,
-                'move_id': move_id,
-                'journal_type': 'cash',
-                'journal_required_fields': False,
-                'account_move_line_group_id': False,
-                'select_to_payment': False,
-            }
-            reconcile.append([move['id'], account_move_line_obj.copy(cr, uid, move['id'], vals, context=ctx)])
+        vals = {
+		    'date': payment_date,
+            'journal_id': bank_journal.id,
+            'debit': credit,
+            'credit': debit,
+            'period_id': period_id,
+            'move_type_id': False,
+            'move_id': move_id,
+            'journal_type': 'cash',
+            'journal_required_fields': False,
+            'account_id': account_id,
+            'account_move_line_group_id': False,
+            'select_to_payment': False,
+        }
+        move_ids.append(account_move_line_obj.create(cr, uid, vals, context=ctx))
 
         account_id = journal.type == 'purchase' and bank_journal.default_credit_account_id.id or bank_journal.default_debit_account_id.id
         vals = {
@@ -106,8 +123,7 @@ class account_journal(osv.osv):
         }
         account_move_line_obj.create(cr, uid, vals, context=ctx)
 
-        for line_ids in reconcile:
-            account_move_line_obj.reconcile(cr, uid, line_ids, context=context)
+        account_move_line_obj.reconcile(cr, uid, move_ids, context=context)
 
 account_journal()
 
@@ -330,11 +346,11 @@ class account_move_line_group(osv.osv):
         C2 = str(line.partner_id.name).ljust(24)[:24].upper()
         D1 = str(bank.bank and bank.bank.name or bank.name)[:24].ljust(24).upper()
         D2 = ' ' * 8
-        D3 = str(bank.guichet).ljust(5).upper()
-        D4 = str(bank.compte).ljust(11).upper()
+        D3 = str(bank.guichet).rjust(5, '0')
+        D4 = str(bank.compte).rjust(11, '0')
         E = str(int(float('%.2f' % line.debit) * 100)).zfill(16)
         F = str(line.name or ' ')[:31].ljust(31).upper()
-        G1 = str(bank.banque).ljust(5).upper()
+        G1 = str(bank.banque).rjust(5, '0')
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2 + D3 + D4 + E + F + G1 + G2
         if len(str_etbac) != 160:
@@ -360,9 +376,9 @@ class account_move_line_group(osv.osv):
         D1 = str(bank.bank and bank.bank.name or bank.name or ' ')[:24].ljust(24).upper()
         D2_1 = line.move_type_id and line.move_type_id.traite_code.ljust(1) or '0'
         D2_2 = ' ' * 2
-        D3 = str(bank.banque).ljust(5).upper()
-        D4 = str(bank.guichet).ljust(5).upper()
-        D5 = str(bank.compte).ljust(11).upper()
+        D3 = str(bank.banque).rjust(5, '0')
+        D4 = str(bank.guichet).rjust(5, '0')
+        D5 = str(bank.compte).rjust(11, '0')
         E1 = str(int(float('%.2f' % line.debit) * 100)).zfill(12)
         E2 = ' ' * 4
         date = line.date_maturity
