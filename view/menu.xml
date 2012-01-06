@@ -25,6 +25,7 @@
         ##############################################################################
 
         <menuitem id="menu_account_auto_payment" parent="account.menu_finance" sequence="100" name="Payment"/>
+        <menuitem id="menu_account_auto_payment_conf" parent="menu_account_auto_payment" sequence="100" name="Configuration" groups="base.group_system"/>
 
     </data>
 </openerp>

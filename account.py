@@ -210,13 +210,14 @@ class account_move_line_group(osv.osv):
         if context:
             context['display_select'] = True
         result = super(osv.osv, self).fields_view_get(cr, uid, view_id,view_type,context,toolbar=toolbar)
-        res = self.pool.get('account.move.line').fields_view_get(cr, uid, view_type='tree', context=context)
-        result['fields']['account_move_line_ids']['views'] = {
-            'tree': {
-                'arch': res['arch'],
-                'fields': res['fields'],
-            },
-        }
+        if context.get('journal_id'):
+            res = self.pool.get('account.move.line').fields_view_get(cr, uid, view_type='tree', context=context)
+            result['fields']['account_move_line_ids']['views'] = {
+                'tree': {
+                    'arch': res['arch'],
+                    'fields': res['fields'],
+                },
+            }
         return result
 
     def button_done(self, cr, uid, ids, context):
@@ -252,6 +253,27 @@ class account_move_line_group(osv.osv):
                 this.write({'etebac': etebac}, context=context)
 
             wf_service.trg_validate(uid, 'account.move.line.group', this.id, 'signal_done', cr)
+        return True
+
+    def button_remake_etebac(self, cr, uid, ids, context):
+        account_journal_obj = self.pool.get('account.journal')
+        for this in self.browse(cr, uid, ids, context=context):
+            date_move = {}
+            for line in this.account_move_line_ids:
+                if not date_move.get(line.date_maturity, False):
+                    date_move[line.date_maturity] = [line.id]
+                else:
+                    date_move[line.date_maturity].append(line.id)
+
+            if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
+                buf = StringIO()
+                for date, move_ids in date_move.items():
+                    self.export_bank_transfert(cr, uid, this, buf, date, move_ids, context=context)
+
+                etebac = base64.encodestring(buf.getvalue())
+                buf.close()
+                this.write({'etebac': etebac}, context=context)
+
         return True
 
     def name_get(self, cr, uid, ids, context=None):
