@@ -81,6 +81,9 @@ class account_journal(osv.osv):
                 elif move.move_type_id.account == 'custom':
                     account_id = move.move_type_id.account_id.id
 
+        if not account_id:
+            raise osv.except_osv(_('Error'), _('Pas de type définis'))
+
         if journal.type == 'purchase':
             credit = credit - debit
             debit = 0
@@ -90,6 +93,7 @@ class account_journal(osv.osv):
 
         move_id = self.pool.get('account.move').create(cr, uid, {'date': payment_date, 'journal_id': bank_journal.id, 'period_id':period_id}, context=ctx)
         vals = {
+            'name':journal.name,
 		    'date': payment_date,
             'journal_id': bank_journal.id,
             'debit': credit,
