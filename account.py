@@ -75,10 +75,7 @@ class account_journal(osv.osv):
             debit += move.debit
             credit += move.credit
             if journal.type in ('traite', 'cheque') and not account_id:
-                if move.move_type_id.account == 'debit':
-                    account_id = journal.default_debit_account_id and journal.default_debit_account_id.id or False
-                elif move.move_type_id.account == 'credit':
-                    account_id = journal.default_credit_account_id and journal.default_credit_account_id.id or False
+                account_id = journal.default_debit_account_id and journal.default_debit_account_id.id or False
             elif journal.type == 'purchase':
                 vals = {
 		            'date': payment_date,
