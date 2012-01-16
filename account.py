@@ -637,7 +637,7 @@ class account_move_line(osv.osv):
     def write(self, cr, uid, ids, values, context=None, check=True, update_check=True):
         if context is None:
             context = {}
-        if context.get('update_check'):
+        if context.get('update_check', None) is not None:
             update_check=context['update_check']
         return super(account_move_line, self).write(cr, uid, ids, values, context=context, check=check, update_check=update_check)
 
