@@ -199,7 +199,7 @@ class account_move_line_group(osv.osv):
                 line_ids.append(line_id)
 
             for id, select in account_move_line_obj.get_select_to_payment(cr, uid, line_ids, context=context).items():
-                account_move_line_obj.write(cr, uid, [id], {'select_to_payment': select}, context=context)
+                account_move_line_obj.write(cr, uid, [id], {'select_to_payment': select}, context=context, update_check=False)
 
         return super(account_move_line_group, self).create(cr, uid, values, context=context)
 
@@ -225,7 +225,7 @@ class account_move_line_group(osv.osv):
             date_move = {}
             for line in this.account_move_line_ids:
                 if not line.select_to_payment:
-                    line.write({'account_move_line_group_id': False}, context=context)
+                    line.write({'account_move_line_group_id': False}, context=context, update_check=False)
                     continue
                 if not date_move.get(line.date_maturity, False):
                     date_move[line.date_maturity] = [line.id]
@@ -633,6 +633,14 @@ class account_move_line(osv.osv):
             values['value']['account_required_fields'] = account.user_type.required_fields
 
         return values
+
+    def write(self, cr, uid, ids, values, context=None):
+        if context is None:
+            context = {}
+        if context.get('update_check'):
+            return super(account_move_line, self).write(cr, uid, ids, values, context=context, update_check=context['update_check'])
+        else:
+            return super(account_move_line, self).write(cr, uid, ids, values, context=context)
 
 account_move_line()
 

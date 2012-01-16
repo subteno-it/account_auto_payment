@@ -82,7 +82,7 @@ class account_auto_payment(osv.osv_memory):
         action_id = ir_model_data_obj.read(cr, uid, ir_model_data_id, ['res_id'], context=context)['res_id']
         result = self.pool.get('ir.actions.act_window').read(cr, uid, action_id, [], context=context)
         result['res_id'] = group_id
-        result['context'] = {'journal_id': this.journal_id.id}
+        result['context'] = {'journal_id': this.journal_id.id,' update_check': False}
         return result
 
 account_auto_payment()
