@@ -386,7 +386,7 @@ class account_move_line_group(osv.osv):
         D2 = ' ' * 8
         D3 = str(bank.guichet).rjust(5, '0')
         D4 = str(bank.compte).rjust(11, '0')
-        E = str(int(float('%.2f' % line.debit) * 100)).zfill(16)
+        E = str(int(round(line.debit, 2) * 100)).zfill(16)
         F = str(line.name or ' ')[:31].ljust(31).upper()
         G1 = str(bank.banque).rjust(5, '0')
         G2 = ' ' * 6
@@ -417,7 +417,7 @@ class account_move_line_group(osv.osv):
         D3 = str(bank.banque).rjust(5, '0')
         D4 = str(bank.guichet).rjust(5, '0')
         D5 = str(bank.compte).rjust(11, '0')
-        E1 = str(int(float('%.2f' % line.debit) * 100)).zfill(12)
+        E1 = str(int(round(line.debit, 2) * 100)).zfill(12)
         E2 = ' ' * 4
         date = line.date_maturity
         F1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
@@ -448,7 +448,7 @@ class account_move_line_group(osv.osv):
         D2 = ' ' * 8
         D3 = ' ' * 5
         D4 = ' ' * 11
-        E = str(int(float('%.2f' % montant) * 100)).zfill(16)
+        E = str(int(round(montant, 2) * 100)).zfill(16)
         F = ' ' * 31
         G1 = ' ' * 5
         G2 = ' ' * 6
@@ -472,7 +472,7 @@ class account_move_line_group(osv.osv):
         D3 = ' ' * 5
         D4 = ' ' * 5
         D5 = ' ' * 11
-        E1 = str(int(float('%.2f' % montant) * 100)).zfill(12)
+        E1 = str(int(round(montant, 2) * 100)).zfill(12)
         E2 = ' ' * 4
         F1 = ' ' * 6
         F2 = ' ' * 10
