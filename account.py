@@ -392,7 +392,7 @@ class account_move_line_group(osv.osv):
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2 + D3 + D4 + E + F + G1 + G2
         if len(str_etbac) != 160:
-            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire %s') % len(str_etbac))
+            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire %s') % line.partner_id.name)
         buf.write(str(str_etbac) + '\n')
         return line.debit
 
