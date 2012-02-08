@@ -380,7 +380,7 @@ class account_move_line_group(osv.osv):
         B1 = line.move_type_id and line.move_type_id.code.ljust(2) or '02'
         B2 = ' ' * 8
         B3 = ' ' * 6
-        C1 = str(line.ref or ' ').ljust(12).upper()
+        C1 = str(line.ref or ' ')[:12].ljust(12).upper()
         C2 = str(line.partner_id.name).ljust(24)[:24].upper()
         D1 = str(bank.bank and bank.bank.name or bank.name)[:24].ljust(24).upper()
         D2 = ' ' * 8
