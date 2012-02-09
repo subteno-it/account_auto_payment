@@ -227,10 +227,16 @@ class account_move_line_group(osv.osv):
                 if not line.select_to_payment:
                     line.write({'account_move_line_group_id': False}, context=context, update_check=False)
                     continue
-                if not date_move.get(line.date_maturity, False):
-                    date_move[line.date_maturity] = [line.id]
-                else:
-                    date_move[line.date_maturity].append(line.id)
+
+                if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
+                    if not line.partner_bank:
+                        raise osv.except_osv(_('Error'), _('No account number define'))
+                    if not date_move.get(line.date_maturity, False):
+                        date_move[line.date_maturity] = {line.partner_bank.id: [line]}
+                    elif not date_move[line.date_maturity].get(line.partner_bank.id, False):
+                        date_move[line.date_maturity][line.partner_bank.id] = [line]
+                    else:
+                        date_move[line.date_maturity][line.partner_bank.id].append(line)
 
                 if not account_move.get(line.account_id.id, False):
                     account_move[line.account_id.id] = [line.id]
@@ -242,8 +248,8 @@ class account_move_line_group(osv.osv):
 
             if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
                 buf = StringIO()
-                for date, move_ids in date_move.items():
-                    self.export_bank_transfert(cr, uid, this, buf, date, move_ids, context=context)
+                for date, accounts in date_move.items():
+                    self.export_bank_transfert(cr, uid, this, buf, date, accounts, context=context)
 
                 etebac = base64.encodestring(buf.getvalue())
                 buf.close()
@@ -257,15 +263,20 @@ class account_move_line_group(osv.osv):
         for this in self.browse(cr, uid, ids, context=context):
             date_move = {}
             for line in this.account_move_line_ids:
-                if not date_move.get(line.date_maturity, False):
-                    date_move[line.date_maturity] = [line.id]
-                else:
-                    date_move[line.date_maturity].append(line.id)
+                if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
+                    if not line.partner_bank:
+                        raise osv.except_osv(_('Error'), _('No account number define'))
+                    if not date_move.get(line.date_maturity, False):
+                        date_move[line.date_maturity] = {line.partner_bank.id: [line]}
+                    elif not date_move[line.date_maturity].get(line.partner_bank.id, False):
+                        date_move[line.date_maturity][line.partner_bank.id] = [line]
+                    else:
+                        date_move[line.date_maturity][line.partner_bank.id].append(line)
 
             if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
                 buf = StringIO()
-                for date, move_ids in date_move.items():
-                    self.export_bank_transfert(cr, uid, this, buf, date, move_ids, context=context)
+                for date, accounts in date_move.items():
+                    self.export_bank_transfert(cr, uid, this, buf, date, accounts, context=context)
 
                 etebac = base64.encodestring(buf.getvalue())
                 buf.close()
@@ -282,25 +293,32 @@ class account_move_line_group(osv.osv):
             res.append(( read['id'], read['journal_id'][1] + "/" + read['payment_date']))
         return res
 
-    def export_bank_transfert(self, cr, uid, this, buf, date, line_ids, context=None):
+    def export_bank_transfert(self, cr, uid, this, buf, date, accounts, context=None):
         """ select account.move.lines to export
             @params etbac : browse on current wizard id
         """
         amount = 0.0
-        lines_obj = self.pool.get('account.move.line')
         if this.journal_id.type == 'purchase':
             self.etbac_format_move_emetteur(cr, uid, this, buf, '02', date, context=context)
-            for line in lines_obj.browse(cr, uid, line_ids, context=context):
-                amount += self.etbac_format_move_destinataire(cr, uid, line, this, buf, context=context)
+            for account_id, lines in accounts.items():
+                bank = lines[0].partner_bank
+                amount_lines = 0.0
+                for line in lines:
+                    amount_lines += line.credit - line.debit
+                if amount_lines > 0.0:
+                    self.etbac_format_move_destinataire(cr, uid, bank, lines[0], amount_lines, this, buf, context=context)
+                    amount_lines += amount_lines
+                elif amount_lines < 0.0:
+                    raise osv.except_osv(_('Error'), _('No amount < 0 is allowed for etebac'))
             self.etbac_format_move_total(cr, uid, this, buf, amount, '02', context=context)
         elif this.journal_id.type == 'traite':
             num = 2
             self.etbac_format_move_emetteur_traite(cr, uid, this, buf, '60', date, context=context)
-            for line in lines_obj.browse(cr, uid, line_ids, context=context):
-                amount += self.etbac_format_move_destinataire_traite(cr, uid, line, this, buf, num, context=context)
+            for account_id, line_ids in accounts.items():
+                for line in lines:
+                    amount += self.etbac_format_move_destinataire_traite(cr, uid, line, this, buf, num, context=context)
                 num += 1
             self.etbac_format_move_total_traite(cr, uid, this, buf, amount, '60', num, context=context)
-
 
     def etbac_format_move_emetteur(self, cr, uid, etbac, buf, mode, date, context=None):
         """ Create 'emetteur' segment of ETBAC French Format for record type 03
@@ -368,14 +386,11 @@ class account_move_line_group(osv.osv):
             raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n emetteur traite %s') % len(str_etbac))
         buf.write(str(str_etbac) + '\n')
 
-    def etbac_format_move_destinataire(self, cr, uid, line, etbac, buf, context=None):
+    def etbac_format_move_destinataire(self, cr, uid, bank, line, amount, etbac, buf, context=None):
         """ Create 'destinataire' segment of ETBAC French Format.
             @params P (string) :
             @return (string)
         """
-        bank = line.partner_id.bank_ids and line.partner_id.bank_ids[0] or False
-        if not bank:
-            raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
         A = '06'
         B1 = line.move_type_id and line.move_type_id.code.ljust(2) or '02'
         B2 = ' ' * 8
@@ -394,45 +409,45 @@ class account_move_line_group(osv.osv):
         if len(str_etbac) != 160:
             raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire %s') % line.partner_id.name)
         buf.write(str(str_etbac) + '\n')
-        return line.debit
 
     def etbac_format_move_destinataire_traite(self, cr, uid, line, etbac, buf, num, context=None):
         """ Create 'destinataire' segment of ETBAC French Format.
             @params P (string) :
             @return (string)
         """
-        bank = line.partner_id.bank_ids and line.partner_id.bank_ids[0] or False
-        if not bank:
-            raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
-        A = '06'
-        B1 = line.move_type_id and line.move_type_id.code.ljust(2) or '60'
-        B2 = str(num).rjust(8, '0').upper()
-        B3 = ' ' * 6
-        C1_1 = ' ' * 2
-        C1_2 = str(line.ref or ' ')[:10].ljust(10).upper()
-        C2 = str(line.partner_id.name)[:24].ljust(24).upper()
-        D1 = str(bank.bank and bank.bank.name or bank.name or ' ')[:24].ljust(24).upper()
-        D2_1 = line.move_type_id and line.move_type_id.traite_code.ljust(1) or '0'
-        D2_2 = ' ' * 2
-        D3 = str(bank.banque).rjust(5, '0')
-        D4 = str(bank.guichet).rjust(5, '0')
-        D5 = str(bank.compte).rjust(11, '0')
-        E1 = str(int(round(line.debit, 2) * 100)).zfill(12)
-        E2 = ' ' * 4
-        date = line.date_maturity
-        F1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
-        date = etbac.payment_date
-        F2_1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
-        F2_2 = ' ' * 4
-        F3_1 = ' ' * 1
-        F3_2 = ' ' * 3
-        F3_3 = ' ' * 3
-        F3_4 = ' ' * 9
-        G = ' ' * 10
-        str_etbac = A + B1 + B2 + B3 + C1_1 + C1_2 + C2 + D1 + D2_1 + D2_2 + D3 + D4 + D5 + E1 + E2 + F1 + F2_1 + F2_2 + F3_1 + F3_2 + F3_3 + F3_4 + G
-        if len(str_etbac) != 160:
-            raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire traite %s') % len(str_etbac))
-        buf.write(str(str_etbac) + '\n')
+        if line.debit > 0.0:
+            bank = line.partner_bank
+            if not bank:
+                raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
+            A = '06'
+            B1 = line.move_type_id and line.move_type_id.code.ljust(2) or '60'
+            B2 = str(num).rjust(8, '0').upper()
+            B3 = ' ' * 6
+            C1_1 = ' ' * 2
+            C1_2 = str(line.ref or ' ')[:10].ljust(10).upper()
+            C2 = str(line.partner_id.name)[:24].ljust(24).upper()
+            D1 = str(bank.bank and bank.bank.name or bank.name or ' ')[:24].ljust(24).upper()
+            D2_1 = line.move_type_id and line.move_type_id.traite_code.ljust(1) or '0'
+            D2_2 = ' ' * 2
+            D3 = str(bank.banque).rjust(5, '0')
+            D4 = str(bank.guichet).rjust(5, '0')
+            D5 = str(bank.compte).rjust(11, '0')
+            E1 = str(int(float('%.2f' % line.debit) * 100)).zfill(12)
+            E2 = ' ' * 4
+            date = line.date_maturity
+            F1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
+            date = etbac.payment_date
+            F2_1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
+            F2_2 = ' ' * 4
+            F3_1 = ' ' * 1
+            F3_2 = ' ' * 3
+            F3_3 = ' ' * 3
+            F3_4 = ' ' * 9
+            G = ' ' * 10
+            str_etbac = A + B1 + B2 + B3 + C1_1 + C1_2 + C2 + D1 + D2_1 + D2_2 + D3 + D4 + D5 + E1 + E2 + F1 + F2_1 + F2_2 + F3_1 + F3_2 + F3_3 + F3_4 + G
+            if len(str_etbac) != 160:
+                raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire traite %s') % len(str_etbac))
+            buf.write(str(str_etbac) + '\n')
         return line.debit
 
     def etbac_format_move_total(self, cr, uid, etbac, buf, montant, mode, context=None):
@@ -538,6 +553,8 @@ class account_move_line(osv.osv):
             if context.get('display_select', False):
                 xml += '''<field name="select_to_payment"/>\n'''
                 fields.append('select_to_payment')
+                xml += '''<field name="partner_bank" domain="[('partner_id', '=', partner_id)]"/>\n'''
+                fields.append('partner_bank')
 
             widths = {
                 'ref': 50,
@@ -586,6 +603,8 @@ class account_move_line(osv.osv):
                         attrs.append('attrs="{\'required\': [(\'journal_required_fields\', \'=\', True)]}"')
                     elif field.field == 'date_maturity':
                         attrs.append('attrs="{\'required\': [(\'journal_required_fields\', \'=\', True)]}"')
+                    elif field.field=='partner_bank':
+                        attrs.append('domain="[(\'partner_id\', \'=\', \'partner_id\')]"')
                     if field.readonly:
                         attrs.append('readonly="1"')
                     if field.required:
@@ -631,6 +650,15 @@ class account_move_line(osv.osv):
         if values['value'].get('account_id', None) is not None:
             account = self.pool.get('account.account').browse(cr, uid, values['value'].get('account_id'))
             values['value']['account_required_fields'] = account.user_type.required_fields
+        if partner_id:
+            partner_bank_obj = self.pool.get('res.partner.bank')
+            partner_banks = partner_bank_obj.search(cr, uid, [('partner_id', '=', partner_id), ('default_bank', '=', True)])
+            if not partner_banks:
+                tmp_partner_banks = partner_bank_obj.search(cr, uid, [('partner_id', '=', partner_id)])
+                if len(tmp_partner_banks) == 1:
+                    partner_banks = tmp_partner_banks
+            if partner_banks:
+                values['value']['partner_bank'] = partner_banks[0]
 
         return values
 
