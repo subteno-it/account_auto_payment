@@ -582,7 +582,7 @@ class account_move_line(osv.osv):
                 if column:
                     fields.append(field.field)
                     attrs = []
-                    if context.get('display_select', False):
+                    if context.get('display_select', False) and field.field != 'date_maturity':
                         attrs.append('readonly="1"')
 
                     if field.field=='debit':
