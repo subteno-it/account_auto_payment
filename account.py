@@ -307,7 +307,7 @@ class account_move_line_group(osv.osv):
                     amount_lines += line.credit - line.debit
                 if amount_lines > 0.0:
                     self.etbac_format_move_destinataire(cr, uid, bank, lines[0], amount_lines, this, buf, context=context)
-                    amount_lines += amount_lines
+                    amount += amount_lines
                 elif amount_lines < 0.0:
                     raise osv.except_osv(_('Error'), _('No amount < 0 is allowed for etebac'))
             self.etbac_format_move_total(cr, uid, this, buf, amount, '02', context=context)
@@ -401,7 +401,7 @@ class account_move_line_group(osv.osv):
         D2 = ' ' * 8
         D3 = str(bank.guichet).rjust(5, '0')
         D4 = str(bank.compte).rjust(11, '0')
-        E = str(int(round(line.debit, 2) * 100)).zfill(16)
+        E = str(int(round(amount, 2) * 100)).zfill(16)
         F = str(line.name or ' ')[:31].ljust(31).upper()
         G1 = str(bank.banque).rjust(5, '0')
         G2 = ' ' * 6
@@ -432,7 +432,7 @@ class account_move_line_group(osv.osv):
             D3 = str(bank.banque).rjust(5, '0')
             D4 = str(bank.guichet).rjust(5, '0')
             D5 = str(bank.compte).rjust(11, '0')
-            E1 = str(int(float('%.2f' % line.debit) * 100)).zfill(12)
+            E1 = str(int(round(line.debit, 2) * 100)).zfill(12)
             E2 = ' ' * 4
             date = line.date_maturity
             F1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
