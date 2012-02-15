@@ -314,7 +314,7 @@ class account_move_line_group(osv.osv):
         elif this.journal_id.type == 'traite':
             num = 2
             self.etbac_format_move_emetteur_traite(cr, uid, this, buf, '60', date, context=context)
-            for account_id, line_ids in accounts.items():
+            for account_id, lines in accounts.items():
                 for line in lines:
                     amount += self.etbac_format_move_destinataire_traite(cr, uid, line, this, buf, num, context=context)
                 num += 1
