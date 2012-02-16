@@ -215,7 +215,7 @@
                         <field name="bank_journal_id" readonly="1"/>
                     </group>
                     <field name="account_move_line_ids" colspan="4" nolabel="1" readonly="1"/>
-                    <button string="Remake etebac" states="draft" type="object" name="button_remake_etebac"/>
+                    <button string="Remake etebac" states="draft" type="object" name="button_remake_etebac" icon="gtk-go-forward"/>
                     <field name="etebac"/>
                 </form>
             </field>
