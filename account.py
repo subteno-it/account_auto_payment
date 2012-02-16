@@ -297,18 +297,18 @@ class account_move_line_group(osv.osv):
         """ select account.move.lines to export
             @params etbac : browse on current wizard id
         """
-        amount = 0.0
+        amount = 0
         if this.journal_id.type == 'purchase':
             self.etbac_format_move_emetteur(cr, uid, this, buf, '02', date, context=context)
             for account_id, lines in accounts.items():
                 bank = lines[0].partner_bank
-                amount_lines = 0.0
+                amount_lines = 0
                 for line in lines:
-                    amount_lines += line.credit - line.debit
-                if amount_lines > 0.0:
+                    amount_lines += int(line.credit * 100) - int(line.debit * 100)
+                if amount_lines > 0:
                     self.etbac_format_move_destinataire(cr, uid, bank, lines[0], amount_lines, this, buf, context=context)
                     amount += amount_lines
-                elif amount_lines < 0.0:
+                elif amount_lines < 0:
                     raise osv.except_osv(_('Error'), _('No amount < 0 is allowed for etebac'))
             self.etbac_format_move_total(cr, uid, this, buf, amount, '02', context=context)
         elif this.journal_id.type == 'traite':
@@ -401,7 +401,7 @@ class account_move_line_group(osv.osv):
         D2 = ' ' * 8
         D3 = str(bank.guichet).rjust(5, '0')
         D4 = str(bank.compte).rjust(11, '0')
-        E = str(int(round(amount, 2) * 100)).zfill(16)
+        E = str(amount).zfill(16)
         F = str(line.name or ' ')[:31].ljust(31).upper()
         G1 = str(bank.banque).rjust(5, '0')
         G2 = ' ' * 6
@@ -432,7 +432,7 @@ class account_move_line_group(osv.osv):
             D3 = str(bank.banque).rjust(5, '0')
             D4 = str(bank.guichet).rjust(5, '0')
             D5 = str(bank.compte).rjust(11, '0')
-            E1 = str(int(round(line.debit, 2) * 100)).zfill(12)
+            E1 = str(int(line.debit * 100)).zfill(12)
             E2 = ' ' * 4
             date = line.date_maturity
             F1 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
@@ -448,7 +448,7 @@ class account_move_line_group(osv.osv):
             if len(str_etbac) != 160:
                 raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire traite %s') % len(str_etbac))
             buf.write(str(str_etbac) + '\n')
-        return line.debit
+        return int(line.debit * 100)
 
     def etbac_format_move_total(self, cr, uid, etbac, buf, montant, mode, context=None):
         """ Create 'total' segment of ETBAC French Format.
@@ -463,7 +463,7 @@ class account_move_line_group(osv.osv):
         D2 = ' ' * 8
         D3 = ' ' * 5
         D4 = ' ' * 11
-        E = str(int(round(montant, 2) * 100)).zfill(16)
+        E = str(montant).zfill(16)
         F = ' ' * 31
         G1 = ' ' * 5
         G2 = ' ' * 6
@@ -487,7 +487,7 @@ class account_move_line_group(osv.osv):
         D3 = ' ' * 5
         D4 = ' ' * 5
         D5 = ' ' * 11
-        E1 = str(int(round(montant, 2) * 100)).zfill(12)
+        E1 = str(montant).zfill(12)
         E2 = ' ' * 4
         F1 = ' ' * 6
         F2 = ' ' * 10
