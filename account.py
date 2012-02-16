@@ -317,7 +317,7 @@ class account_move_line_group(osv.osv):
             for account_id, lines in accounts.items():
                 for line in lines:
                     amount += self.etbac_format_move_destinataire_traite(cr, uid, line, this, buf, num, context=context)
-                num += 1
+                    num += 1
             self.etbac_format_move_total_traite(cr, uid, this, buf, amount, '60', num, context=context)
 
     def etbac_format_move_emetteur(self, cr, uid, etbac, buf, mode, date, context=None):
@@ -477,7 +477,7 @@ class account_move_line_group(osv.osv):
         """
         A = '08'
         B1 = mode.ljust(2)
-        B2 = str(num).rjust(8, '0').upper()
+        B2 = str(num).ljust(8, '0').upper()
         B3 = ' ' * 6
         C1 = ' ' * 12
         C2 = ' ' * 24
