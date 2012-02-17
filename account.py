@@ -456,7 +456,7 @@ class account_move_line_group(osv.osv):
             if len(str_etbac) != 160:
                 raise osv.except_osv(_('Error !'), _('Exception during ETBAC formatage !\n destinataire traite %s') % len(str_etbac))
             buf.write(str(str_etbac) + '\n')
-        return f_str(line.debit)
+        return int(f_str(line.debit))
 
     def etbac_format_move_total(self, cr, uid, etbac, buf, montant, mode, context=None):
         """ Create 'total' segment of ETBAC French Format.
