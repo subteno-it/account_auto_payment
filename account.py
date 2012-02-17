@@ -429,7 +429,7 @@ class account_move_line_group(osv.osv):
                 raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
             A = '06'
             B1 = line.move_type_id and line.move_type_id.code.ljust(2) or '60'
-            B2 = str(num).ljust(8, '0').upper()
+            B2 = str(num).rjust(8, '0').upper()
             B3 = ' ' * 6
             C1_1 = ' ' * 2
             C1_2 = str(line.ref or ' ')[:10].ljust(10).upper()
@@ -485,7 +485,7 @@ class account_move_line_group(osv.osv):
         """
         A = '08'
         B1 = mode.ljust(2)
-        B2 = str(num).ljust(8, '0').upper()
+        B2 = str(num).rjust(8, '0').upper()
         B3 = ' ' * 6
         C1 = ' ' * 12
         C2 = ' ' * 24
