@@ -43,7 +43,6 @@ class account_journal(osv.osv):
          'make_etebac': lambda *a: False,
     }
 
-
     def __init__(self, pool, cr):
         """
         Add new type of journal
@@ -70,7 +69,7 @@ class account_journal(osv.osv):
         period_id = account_period_obj.find(cr, uid, payment_date, context=context)[0]
         reconcile = []
         account_id = False
-        move_id = self.pool.get('account.move').create(cr, uid, {'date': payment_date, 'journal_id': bank_journal.id, 'period_id':period_id}, context=ctx)
+        move_id = self.pool.get('account.move').create(cr, uid, {'date': payment_date, 'journal_id': bank_journal.id, 'period_id': period_id}, context=ctx)
         for move in account_move_line_obj.browse(cr, uid, move_ids, context=ctx):
             debit += move.debit
             credit += move.credit
@@ -78,7 +77,7 @@ class account_journal(osv.osv):
                 account_id = journal.default_debit_account_id and journal.default_debit_account_id.id or False
             elif journal.type == 'purchase':
                 vals = {
-		            'date': payment_date,
+                    'date': payment_date,
                     'journal_id': bank_journal.id,
                     'debit': move.credit,
                     'credit': move.debit,
@@ -101,8 +100,8 @@ class account_journal(osv.osv):
             debit = debit - credit
             credit = 0
             vals = {
-                'name':journal.name,
-		        'date': payment_date,
+                'name': journal.name,
+                'date': payment_date,
                 'journal_id': bank_journal.id,
                 'debit': credit,
                 'credit': debit,
@@ -119,7 +118,7 @@ class account_journal(osv.osv):
 
         account_id = journal.type == 'purchase' and bank_journal.default_credit_account_id.id or bank_journal.default_debit_account_id.id
         vals = {
-	    'date': payment_date,
+            'date': payment_date,
             'name': bank_journal.name,
             'journal_id': bank_journal.id,
             'debit': debit,
@@ -153,7 +152,7 @@ class account_move_type(osv.osv):
         'type': fields.selection([('sale', 'Sale'), ('purchase', 'Purchase'), ('cash', 'Cash'), ('general', 'General'), ('situation', 'Situation'), ('traite', 'Traite'), ('cheque', 'Cheque')], 'Display type', required=True, help="View only in the moves in this journal type"),
         'code': fields.char('Code', size=2, required=True, help="Code of the operation"),
         'traite_code': fields.char('Traite Code', size=1, help="use for the traite"),
-        'account': fields.selection([('credit','Journal credit account'), ('debit','Journal debit account'), ('custom','Account on type')], 'Account parent', required=True, help="Select the account parent for find move\nJournal credit account: take the credit account of the journal\n Journal debit account: take the debit journal account\nAccount on type: take the account on this type"),
+        'account': fields.selection([('credit', 'Journal credit account'), ('debit', 'Journal debit account'), ('custom', 'Account on type')], 'Account parent', required=True, help="Select the account parent for find move\nJournal credit account: take the credit account of the journal\n Journal debit account: take the debit journal account\nAccount on type: take the account on this type"),
         'account_id': fields.many2one('account.account', 'Parent account', help="Use for get the moves line for automatique payment"),
     }
 
@@ -179,7 +178,7 @@ class account_move_line_group(osv.osv):
         'payment_date': fields.date('Payment date', help="Date of the payment"),
         'bank_journal_id': fields.many2one('account.journal', 'Bank journal', domain=[('type', '=', 'cash')], help="Journal where make the payment"),
         'account_move_line_ids': fields.one2many('account.move.line', 'account_move_line_group_id', 'Move Lines', ),
-        'state': fields.selection([('draft','Draft'), ('done', 'Done')], 'State', help="Use by workflow"),
+        'state': fields.selection([('draft', 'Draft'), ('done', 'Done')], 'State', help="Use by workflow"),
         'etebac': fields.binary('Etebac', help="ETEBAC file"),
     }
 
@@ -206,7 +205,7 @@ class account_move_line_group(osv.osv):
     def fields_view_get(self, cr, uid, view_id=None, view_type='form', context={}, toolbar=False):
         if context:
             context['display_select'] = True
-        result = super(osv.osv, self).fields_view_get(cr, uid, view_id,view_type,context,toolbar=toolbar)
+        result = super(osv.osv, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar=toolbar)
         if context.get('journal_id'):
             res = self.pool.get('account.move.line').fields_view_get(cr, uid, view_type='tree', context=context)
             result['fields']['account_move_line_ids']['views'] = {
@@ -290,15 +289,15 @@ class account_move_line_group(osv.osv):
         reads = self.read(cr, uid, ids, ['journal_id', 'payment_date'], context=context)
         res = []
         for read in reads:
-            res.append(( read['id'], read['journal_id'][1] + "/" + read['payment_date']))
+            res.append((read['id'], read['journal_id'][1] + "/" + read['payment_date']))
         return res
 
     def export_bank_transfert(self, cr, uid, this, buf, date, accounts, context=None):
         """ select account.move.lines to export
             @params etbac : browse on current wizard id
         """
-       def f_str(number):
-            # Format the line 
+        def f_str(number):
+            # Format the line
             return ('%.2f' % number).replace('.', '')
 
         amount = 0
@@ -309,7 +308,7 @@ class account_move_line_group(osv.osv):
                 amount_lines = 0
                 for line in lines:
                     amount_lines += line.credit - line.debit
-               amount_lines = int(f_str(amount_lines))
+                amount_lines = int(f_str(amount_lines))
                 if amount_lines > 0:
                     self.etbac_format_move_destinataire(cr, uid, bank, lines[0], amount_lines, this, buf, context=context)
                     amount += amount_lines
@@ -337,7 +336,7 @@ class account_move_line_group(osv.osv):
         A = '03'
         B1 = mode.ljust(2)
         B2 = ' ' * 8
-        B3 = ' ' * 6  #emeteur
+        B3 = ' ' * 6  # emeteur
         C1_1 = ' '
         C1_2 = ' ' * 5
         C1_3 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
@@ -370,7 +369,7 @@ class account_move_line_group(osv.osv):
         A = '03'
         B1 = mode.ljust(2)
         B2 = '00000001'
-        B3 = ' ' * 6  #emeteur
+        B3 = ' ' * 6  # emeteur
         C1 = ' ' * 6
         C2 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
         C3 = user.company_id.name.encode('ascii', 'replace')[:24].ljust(24).upper()
@@ -420,8 +419,8 @@ class account_move_line_group(osv.osv):
             @params P (string) :
             @return (string)
         """
-       def f_str(number):
-            # Format the line 
+        def f_str(number):
+            # Format the line
             return ('%.2f' % number).replace('.', '')
 
         if line.debit > 0.0:
@@ -548,8 +547,8 @@ class account_move_line(osv.osv):
         return res
 
     def fields_view_get(self, cr, uid, view_id=None, view_type='form', context={}, toolbar=False):
-        result = super(osv.osv, self).fields_view_get(cr, uid, view_id,view_type,context,toolbar=toolbar)
-        if view_type=='tree' and context.get('journal_id',False):
+        result = super(osv.osv, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar=toolbar)
+        if view_type == 'tree' and context.get('journal_id', False):
             title = self.view_header_get(cr, uid, view_id, view_type, context)
             journal = self.pool.get('account.journal').browse(cr, uid, context['journal_id'])
 
@@ -594,14 +593,14 @@ class account_move_line(osv.osv):
                     if context.get('display_select', False) and field.field != 'date_maturity':
                         attrs.append('readonly="1"')
 
-                    if field.field=='debit':
+                    if field.field == 'debit':
                         attrs.append('sum="Total debit"')
-                    elif field.field=='credit':
+                    elif field.field == 'credit':
                         attrs.append('sum="Total credit"')
-                    elif field.field=='account_tax_id':
+                    elif field.field == 'account_tax_id':
                         attrs.append('domain="[(\'parent_id\',\'=\',False)]"')
-                    elif field.field=='account_id' and journal.id:
-                        attrs.append('domain="[(\'journal_id\', \'=\', '+str(journal.id)+'),(\'type\',\'&lt;&gt;\',\'view\'), (\'type\',\'&lt;&gt;\',\'closed\')]" on_change="onchange_account_id(account_id, partner_id)"')
+                    elif field.field == 'account_id' and journal.id:
+                        attrs.append('domain="[(\'journal_id\', \'=\', ' + str(journal.id) + '),(\'type\',\'&lt;&gt;\',\'view\'), (\'type\',\'&lt;&gt;\',\'closed\')]" on_change="onchange_account_id(account_id, partner_id)"')
                     elif field.field == 'partner_id':
                         attrs.append('on_change="onchange_partner_id(move_id,partner_id,account_id,debit,credit,date,((\'journal_id\' in context) and context[\'journal_id\']) or {})"')
                         attrs.append('attrs="{\'required\': [(\'journal_required_fields\', \'=\', True)]}"')
@@ -612,7 +611,7 @@ class account_move_line(osv.osv):
                         attrs.append('attrs="{\'required\': [(\'journal_required_fields\', \'=\', True)]}"')
                     elif field.field == 'date_maturity':
                         attrs.append('attrs="{\'required\': [(\'journal_required_fields\', \'=\', True)]}"')
-                    elif field.field=='partner_bank':
+                    elif field.field == 'partner_bank':
                         attrs.append('domain="[(\'partner_id\', \'=\', \'partner_id\')]"')
                     if field.readonly:
                         attrs.append('readonly="1"')
@@ -620,12 +619,12 @@ class account_move_line(osv.osv):
                         attrs.append('required="1"')
                     else:
                         attrs.append('required="0"')
-                    if field.field in ('amount_currency','currency_id'):
+                    if field.field in ('amount_currency', 'currency_id'):
                         attrs.append('on_change="onchange_currency(account_id,amount_currency,currency_id,date,((\'journal_id\' in context) and context[\'journal_id\']) or {})"')
 
                     if field.field in widths:
-                        attrs.append('width="'+str(widths[field.field])+'"')
-                    xml += '''<field name="%s" %s/>\n''' % (field.field,' '.join(attrs))
+                        attrs.append('width="' + str(widths[field.field]) + '"')
+                    xml += '''<field name="%s" %s/>\n''' % (field.field, ' '.join(attrs))
                 else:
                     fields.append(field)
                     if field == 'journal_id':
@@ -675,7 +674,7 @@ class account_move_line(osv.osv):
         if context is None:
             context = {}
         if context.get('update_check', None) is not None:
-            update_check=context['update_check']
+            update_check = context['update_check']
         return super(account_move_line, self).write(cr, uid, ids, values, context=context, check=check, update_check=update_check)
 
 account_move_line()
