@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OpenERP Server 5.0.15\n"
 "Report-Msgid-Bugs-To: support@openerp.com\n"
-"POT-Creation-Date: 2011-12-28 16:06:43+0000\n"
-"PO-Revision-Date: 2011-12-28 16:06:43+0000\n"
+"POT-Creation-Date: 2012-02-19 14:50:30+0000\n"
+"PO-Revision-Date: 2012-02-19 14:50:30+0000\n"
 "Last-Translator: <>\n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -47,7 +47,13 @@ msgstr ""
 #. module: account_auto_payment
 #: code:addons/account_auto_payment/account.py:0
 #, python-format
-msgid "Exception during ETBAC formatage !"
+msgid "Exception during ETBAC formatage !\n emetteur traite %s"
+msgstr ""
+
+#. module: account_auto_payment
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "Exception during ETBAC formatage !\n destinataire %s"
 msgstr ""
 
 #. module: account_auto_payment
@@ -86,6 +92,12 @@ msgid "Draft"
 msgstr ""
 
 #. module: account_auto_payment
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "Exception during ETBAC formatage !\n total : %s"
+msgstr ""
+
+#. module: account_auto_payment
 #: help:account.auto.payment,maturity_date:0
 #: help:account.move.line.group,maturity_date:0
 msgid "Date max of maturity"
@@ -102,14 +114,19 @@ msgid "Name of the account moves type"
 msgstr ""
 
 #. module: account_auto_payment
+#: field:account.account.type,required_fields:0
 #: field:account.journal,required_fields:0
-#: field:account.move.line,journal_required_fields:0
 msgid "Required fields"
 msgstr ""
 
 #. module: account_auto_payment
-#: field:account.move.line,move_type_id:0
-msgid "Type"
+#: help:account.move.type,account_id:0
+msgid "Use for get the moves line for automatique payment"
+msgstr ""
+
+#. module: account_auto_payment
+#: view:account.move.line.group:0
+msgid "Remake etebac"
 msgstr ""
 
 #. module: account_auto_payment
@@ -139,13 +156,14 @@ msgid "All the line with this group have send in the same bank as the same time"
 msgstr ""
 
 #. module: account_auto_payment
-#: help:account.move.line.group,journal_id:0
-msgid "journal of move"
+#: field:account.auto.payment,payment_date:0
+#: field:account.move.line.group,payment_date:0
+msgid "Payment date"
 msgstr ""
 
 #. module: account_auto_payment
-#: help:account.move.type,traite_code:0
-msgid "use for the traite"
+#: view:account.auto.payment:0
+msgid "Select move"
 msgstr ""
 
 #. module: account_auto_payment
@@ -165,19 +183,28 @@ msgid "Move Lines"
 msgstr ""
 
 #. module: account_auto_payment
-#: field:account.auto.payment,payment_date:0
-#: field:account.move.line.group,payment_date:0
-msgid "Payment date"
+#: help:account.move.line,journal_required_fields:0
+msgid "If check and account required field check, the fields Partner, Maturity date and move type will be required"
 msgstr ""
 
 #. module: account_auto_payment
-#: help:account.move.type,account_id:0
-msgid "Use for get the moves line for automatique payment"
+#: selection:account.auto.payment,type:0
+#: selection:account.move.line,journal_type:0
+#: selection:account.move.type,type:0
+#: model:ir.actions.act_window,name:account_auto_payment.act_open_account_auto_payment_traite_view
+#: model:ir.ui.menu,name:account_auto_payment.menu_account_auto_payment_traite
+msgid "Traite"
 msgstr ""
 
 #. module: account_auto_payment
 #: model:ir.model,name:account_auto_payment.model_account_auto_payment
 msgid "Make payment"
+msgstr ""
+
+#. module: account_auto_payment
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "Exception during ETBAC formatage !\ntotal traite %s"
 msgstr ""
 
 #. module: account_auto_payment
@@ -199,6 +226,11 @@ msgstr ""
 #: view:account.move.line.group:0
 #: model:ir.actions.act_window,name:account_auto_payment.act_open_account_move_line_group_view
 msgid "Select moves"
+msgstr ""
+
+#. module: account_auto_payment
+#: model:ir.ui.menu,name:account_auto_payment.menu_account_auto_payment_conf
+msgid "Configuration"
 msgstr ""
 
 #. module: account_auto_payment
@@ -240,8 +272,25 @@ msgid "Name"
 msgstr ""
 
 #. module: account_auto_payment
+#: field:account.move.line,journal_required_fields:0
+msgid "Journal required fields"
+msgstr ""
+
+#. module: account_auto_payment
 #: help:account.move.type,code:0
 msgid "Code of the operation"
+msgstr ""
+
+#. module: account_auto_payment
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "Pas de type définis"
+msgstr ""
+
+#. module: account_auto_payment
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "No amount < 0 is allowed for etebac"
 msgstr ""
 
 #. module: account_auto_payment
@@ -264,6 +313,12 @@ msgid "Account on type"
 msgstr ""
 
 #. module: account_auto_payment
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "No account number define"
+msgstr ""
+
+#. module: account_auto_payment
 #: help:account.move.line.group,state:0
 msgid "Use by workflow"
 msgstr ""
@@ -280,8 +335,9 @@ msgid "Erreur"
 msgstr ""
 
 #. module: account_auto_payment
-#: help:account.journal.view,color:0
-msgid "define the colors of line"
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "Error"
 msgstr ""
 
 #. module: account_auto_payment
@@ -290,6 +346,7 @@ msgid "Jounal to make payment"
 msgstr ""
 
 #. module: account_auto_payment
+#: help:account.model.line,move_type_id:0
 #: help:account.move.line,move_type_id:0
 msgid "type of payment"
 msgstr ""
@@ -300,8 +357,9 @@ msgid "Group of line"
 msgstr ""
 
 #. module: account_auto_payment
-#: view:account.auto.payment:0
-msgid "Select move"
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "Exception during ETBAC formatage !\n emetteur %s "
 msgstr ""
 
 #. module: account_auto_payment
@@ -310,8 +368,21 @@ msgid "Validate"
 msgstr ""
 
 #. module: account_auto_payment
+#: view:account.move.line.group:0
+#: model:ir.actions.act_window,name:account_auto_payment.act_open_account_move_line_group_history_view
+#: model:ir.ui.menu,name:account_auto_payment.menu_account_move_line_group_history
+msgid "History"
+msgstr ""
+
+#. module: account_auto_payment
 #: view:account.move.type:0
 msgid "Type of journal"
+msgstr ""
+
+#. module: account_auto_payment
+#: field:account.model.line,move_type_id:0
+#: field:account.move.line,move_type_id:0
+msgid "Type"
 msgstr ""
 
 #. module: account_auto_payment
@@ -326,13 +397,13 @@ msgid "Account Auto Payment"
 msgstr ""
 
 #. module: account_auto_payment
-#: help:account.move.line.group,etebac:0
-msgid "ETEBAC file"
+#: help:account.move.type,traite_code:0
+msgid "use for the traite"
 msgstr ""
 
 #. module: account_auto_payment
-#: field:account.journal.view,color:0
-msgid "Color"
+#: help:account.move.line.group,etebac:0
+msgid "ETEBAC file"
 msgstr ""
 
 #. module: account_auto_payment
@@ -341,17 +412,15 @@ msgid "Account parent"
 msgstr ""
 
 #. module: account_auto_payment
-#: selection:account.auto.payment,type:0
-#: selection:account.move.line,journal_type:0
-#: selection:account.move.type,type:0
-#: model:ir.actions.act_window,name:account_auto_payment.act_open_account_auto_payment_traite_view
-#: model:ir.ui.menu,name:account_auto_payment.menu_account_auto_payment_traite
-msgid "Traite"
+#: code:addons/account_auto_payment/account.py:0
+#, python-format
+msgid "Exception during ETBAC formatage !\n destinataire traite %s"
 msgstr ""
 
 #. module: account_auto_payment
+#: help:account.account.type,required_fields:0
 #: help:account.journal,required_fields:0
-#: help:account.move.line,journal_required_fields:0
+#: help:account.move.line,account_required_fields:0
 msgid "If check, the fields Partner, Maturity date and move type will be required"
 msgstr ""
 
@@ -365,6 +434,16 @@ msgstr ""
 #: selection:account.move.line,journal_type:0
 #: selection:account.move.type,type:0
 msgid "General"
+msgstr ""
+
+#. module: account_auto_payment
+#: field:account.move.line,account_required_fields:0
+msgid "Account required fields"
+msgstr ""
+
+#. module: account_auto_payment
+#: help:account.move.line.group,journal_id:0
+msgid "journal of move"
 msgstr ""
 
 #. module: account_auto_payment
