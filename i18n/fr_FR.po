@@ -226,7 +226,7 @@ msgstr "Ajouter assistant pour faire du paiement automatique"
 #: view:account.move.line.group:0
 #: model:ir.actions.act_window,name:account_auto_payment.act_open_account_move_line_group_view
 msgid "Select moves"
-msgstr "Lignes d'écritures sélectionnées"
+msgstr "Salectionner les lignes d'écriture"
 
 #. module: account_auto_payment
 #: model:ir.ui.menu,name:account_auto_payment.menu_account_auto_payment_conf
@@ -389,7 +389,7 @@ msgstr "Type"
 #: field:account.auto.payment,bank_journal_id:0
 #: field:account.move.line.group,bank_journal_id:0
 msgid "Bank journal"
-msgstr "Banque journal"
+msgstr "Journal de banque"
 
 #. module: account_auto_payment
 #: model:ir.module.module,shortdesc:account_auto_payment.module_meta_information
