@@ -338,8 +338,8 @@ class account_move_line_group(osv.osv):
         B2 = ' ' * 8
         B3 = ' ' * 6  # emeteur
         C1_1 = ' '
-        C1_2 = ' ' * 5
-        C1_3 = str(date[8:10] + date[5:7] + date[2:4]).ljust(6)
+        C1_2 = ' ' * 6
+        C1_3 = str(date[8:10] + date[5:7] + date[3]).ljust(5)
         C2 = user.company_id.name.encode('ascii', 'replace')[:24].ljust(24).upper()
         D1_1 = ' ' * 7
         D1_2 = ' ' * 17
