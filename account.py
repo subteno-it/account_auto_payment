@@ -69,18 +69,47 @@ class account_journal(osv.osv):
         period_id = account_period_obj.find(cr, uid, payment_date, context=context)[0]
         reconcile = []
         account_id = False
+
         move_id = self.pool.get('account.move').create(cr, uid, {'date': payment_date, 'journal_id': bank_journal.id, 'period_id': period_id}, context=ctx)
+
+        if journal.type in ('traite', 'cheque'):
+            account_id = journal.default_debit_account_id and journal.default_debit_account_id.id or False
+
+        # Stockage temporaire pour regrouper les lignes d'écriture par compte fournisseur
+        groupir = {}
         for move in account_move_line_obj.browse(cr, uid, move_ids, context=ctx):
             debit += move.debit
             credit += move.credit
-            if journal.type in ('traite', 'cheque') and not account_id:
-                account_id = journal.default_debit_account_id and journal.default_debit_account_id.id or False
-            elif journal.type == 'purchase':
+            if journal.type == 'purchase':
+                if groupir.get(move.account_id.id):
+                    groupir[move.account_id.id].append(move.id)
+                else:
+                    groupir[move.account_id.id] = [move.id]
+
+        # Pour chaque compte comptable, on a regrouper les lignes d'écritures, on crée 1 seul ecriture de banque
+        if journal.type == 'purchase':
+            for acc_id, m_ids in groupir.items():
+                tmp_ids = m_ids
+                tdebit = 0
+                gdebit = 0
+                gcredit = 0
+                for gmove in account_move_line_obj.browse(cr, uid, m_ids, context=ctx):
+                    gdebit += gmove.debit
+                    gcredit += gmove.credit
+
+                # Si nous avons des factures et des avoirs, nosu faisons un seul mouvement avec les 2
+                if gcredit > gdebit:
+                    tcredit = gcredit - gdebit
+                    tdebit = 0
+                else:
+                    tcredit = 0
+                    tdebit = tdebit - tcredit
+
                 vals = {
                     'date': payment_date,
                     'journal_id': bank_journal.id,
-                    'debit': move.credit,
-                    'credit': move.debit,
+                    'debit': tcredit,
+                    'credit': tdebit,
                     'period_id': period_id,
                     'move_type_id': False,
                     'move_id': move_id,
@@ -89,7 +118,10 @@ class account_journal(osv.osv):
                     'account_move_line_group_id': False,
                     'select_to_payment': False,
                 }
-                reconcile.append([move.id, account_move_line_obj.copy(cr, uid, move.id, vals, context=ctx)])
+                # On ajoute l'écriture fournisseur du journal de banque aux écritures du journal d'achat
+                # pour les réconciliés à la fin
+                tmp_ids.append(account_move_line_obj.copy(cr, uid, m_ids[0], vals, context=ctx))
+                reconcile.append(tmp_ids)
 
         if journal.type == 'purchase':
             credit = credit - debit
@@ -116,7 +148,7 @@ class account_journal(osv.osv):
             }
             move_ids.append(account_move_line_obj.create(cr, uid, vals, context=ctx))
 
-        account_id = journal.type == 'purchase' and bank_journal.default_credit_account_id.id or bank_journal.default_debit_account_id.id
+        # Creation du mouvement de banque associé
         vals = {
             'date': payment_date,
             'name': bank_journal.name,
@@ -125,7 +157,7 @@ class account_journal(osv.osv):
             'credit': credit,
             'period_id': period_id,
             'move_type_id': False,
-            'account_id': account_id,
+            'account_id': journal.type == 'purchase' and bank_journal.default_credit_account_id.id or bank_journal.default_debit_account_id.id,
             'move_id': move_id,
             'journal_type': 'cash',
             'journal_required_fields': False,
@@ -218,13 +250,15 @@ class account_move_line_group(osv.osv):
 
     def button_done(self, cr, uid, ids, context):
         account_journal_obj = self.pool.get('account.journal')
+        account_move_line_obj = self.pool.get('account.move.line')
         wf_service = netsvc.LocalService("workflow")
+        free_line_ids = []  # Une seule requete pour liberer les ecritures non coché
         for this in self.browse(cr, uid, ids, context=context):
             account_move = {}
             date_move = {}
             for line in this.account_move_line_ids:
                 if not line.select_to_payment:
-                    line.write({'account_move_line_group_id': False}, context=context, update_check=False)
+                    free_line_ids.append(line.id)
                     continue
 
                 if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
@@ -242,13 +276,19 @@ class account_move_line_group(osv.osv):
                 else:
                     account_move[line.account_id.id].append(line.id)
 
+            # liberation de toute les lignes non traité en une seul fois
+            if free_line_ids:
+                account_move_line_obj.write(cr, uid, free_line_ids, {'account_move_line_group_id': False}, context=context, update_check=False)
+
+            # Pour chaque compte comptable
             for account_id, move_ids in account_move.items():
                 account_journal_obj.make_auto_payment(cr, uid, this.journal_id, this.bank_journal_id, move_ids, this.payment_date, context=context)
 
             if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
                 buf = StringIO()
                 for date, accounts in date_move.items():
-                    self.export_bank_transfert(cr, uid, this, buf, date, accounts, context=context)
+                    if date:
+                        self.export_bank_transfert(cr, uid, this, buf, date, accounts, context=context)
 
                 etebac = base64.encodestring(buf.getvalue())
                 buf.close()
@@ -275,7 +315,8 @@ class account_move_line_group(osv.osv):
             if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
                 buf = StringIO()
                 for date, accounts in date_move.items():
-                    self.export_bank_transfert(cr, uid, this, buf, date, accounts, context=context)
+                    if date:
+                        self.export_bank_transfert(cr, uid, this, buf, date, accounts, context=context)
 
                 etebac = base64.encodestring(buf.getvalue())
                 buf.close()
@@ -311,9 +352,9 @@ class account_move_line_group(osv.osv):
                 amount_lines = int(f_str(amount_lines))
                 if amount_lines > 0:
                     self.etbac_format_move_destinataire(cr, uid, bank, lines[0], amount_lines, this, buf, context=context)
-                    amount += amount_lines
-                elif amount_lines < 0:
-                    raise osv.except_osv(_('Error'), _('No amount < 0 is allowed for etebac'))
+                amount += amount_lines
+            if amount < 0:
+                raise osv.except_osv(_('Error'), _('No amount < 0 is allowed for etebac'))
             self.etbac_format_move_total(cr, uid, this, buf, amount, '02', context=context)
         elif this.journal_id.type == 'traite':
             num = 2
@@ -546,6 +587,18 @@ class account_move_line(osv.osv):
 
         return res
 
+    def onchange_select_to_payment(self, cr, uid, ids, partner_id, context=None):
+        """
+        #TODO make doc string
+        Comment this/compute new values from the db/system
+        """
+        res = {}
+        if partner_id:
+            partner_obj = self.pool.get('res.partner')
+            partner = partner_obj.browse(cr, uid, partner_id, context=context)
+            res['value'] = {'partner_bank': partner.bank_ids and len(partner.bank_ids) == 1 and partner.bank_ids[0].id or False}
+        return res
+
     def fields_view_get(self, cr, uid, view_id=None, view_type='form', context={}, toolbar=False):
         result = super(osv.osv, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar=toolbar)
         if view_type == 'tree' and context.get('journal_id', False):
@@ -559,10 +612,13 @@ class account_move_line(osv.osv):
             xml = '''<tree string="%s" editable="top" refresh="5" on_write="_on_create_write"%s>\n\t''' % (title, state)
             fields = []
             if context.get('display_select', False):
-                xml += '''<field name="select_to_payment"/>\n'''
+                xml += '''<field name="select_to_payment" on_change="onchange_select_to_payment(partner_id)"/>\n'''
                 fields.append('select_to_payment')
                 xml += '''<field name="partner_bank" domain="[('partner_id', '=', partner_id)]"/>\n'''
                 fields.append('partner_bank')
+                if journal.type == 'purchase':
+                    xml += '''<field name="blocked"/>\n'''
+                    fields.append('blocked')
 
             widths = {
                 'ref': 50,
@@ -716,5 +772,20 @@ class account_model_line(osv.osv):
     }
 
 account_model_line()
+
+
+class account_payment_term(osv.osv):
+    _inherit = 'account.payment.term'
+
+    _columns = {
+        'bank_transfer': fields.boolean('Bank Transfer', help='If checked, this partner will be used for bank transfer'),
+    }
+
+    _defaults = {
+        'bank_transfer': lambda *a: False,
+    }
+
+account_payment_term()
+
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:

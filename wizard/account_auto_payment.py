@@ -45,6 +45,8 @@ class account_auto_payment(osv.osv_memory):
         this = self.browse(cr, uid, ids[0], context=context)
         account_move_type_obj = self.pool.get('account.move.type')
         account_move_line_obj = self.pool.get('account.move.line')
+        account_account_obj = self.pool.get('account.account')
+        partner_obj = self.pool.get('res.partner')
         account_move_type_ids = account_move_type_obj.search(cr, uid, [('type', '=', this.type)], context=context)
         account_ids = []
         account_op = 'in'
@@ -54,6 +56,10 @@ class account_auto_payment(osv.osv_memory):
             elif type.account == 'credit':
                 account_id = this.journal_id.default_credit_account_id and this.journal_id.default_credit_account_id.id or False
             elif type.account == 'custom':
+                if this.type == 'purchase':
+                    account_partner_ids = account_account_obj.search(cr, uid, [('parent_id', '=', type.account_id.id)], context=context)
+                    partner_ids = partner_obj.search(cr, uid, [('property_account_payable', 'in', account_partner_ids)], context=context)
+                    account_supplier_ids = [partner.property_account_payable.id for partner in partner_obj.browse(cr, uid, partner_ids, context=context) if partner.property_payment_term.bank_transfer]
                 account_id = type.account_id.id
                 account_op = 'child_of'
 
@@ -61,10 +67,18 @@ class account_auto_payment(osv.osv_memory):
                 account_ids.append(account_id)
 
         domain = [
-            ('journal_id', '=', this.journal_id.id),
-            ('account_id', account_op, account_ids),
             ('reconcile_id', '=', False),
         ]
+        if this.type != 'purchase':
+            domain.extend([
+                ('journal_id', '=', this.journal_id.id),
+                ('account_id', account_op, account_ids),
+            ])
+        else:
+            domain.extend([
+                ('account_id', 'in', account_supplier_ids),
+                ('journal_id.type', 'in', ('purchase', 'cash')),
+            ])
         if this.maturity_date:
             domain.extend(['|', ('date_maturity', '<=', this.maturity_date), ('date_maturity', '=', False)])
 
