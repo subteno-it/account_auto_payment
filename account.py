@@ -24,10 +24,13 @@
 
 from osv import osv
 from osv import fields
+from osv import orm
 import netsvc
 from StringIO import StringIO
 import base64
 from tools.translate import _
+from lxml import etree
+from operator import itemgetter
 
 
 class account_journal(osv.osv):
@@ -224,7 +227,6 @@ class account_move_line_group(osv.osv):
         """
         if values.get('account_move_line_ids'):
             account_move_line_obj = self.pool.get('account.move.line')
-            dates = []
             line_ids = []
             for x, line_id in values['account_move_line_ids']:
                 line_ids.append(line_id)
@@ -262,14 +264,14 @@ class account_move_line_group(osv.osv):
                     continue
 
                 if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
-                    if not line.partner_bank:
+                    if not line.partner_bank_id:
                         raise osv.except_osv(_('Error'), _('No account number define'))
                     if not date_move.get(line.date_maturity, False):
-                        date_move[line.date_maturity] = {line.partner_bank.id: [line]}
-                    elif not date_move[line.date_maturity].get(line.partner_bank.id, False):
-                        date_move[line.date_maturity][line.partner_bank.id] = [line]
+                        date_move[line.date_maturity] = {line.partner_bank_id.id: [line]}
+                    elif not date_move[line.date_maturity].get(line.partner_bank_id.id, False):
+                        date_move[line.date_maturity][line.partner_bank_id.id] = [line]
                     else:
-                        date_move[line.date_maturity][line.partner_bank.id].append(line)
+                        date_move[line.date_maturity][line.partner_bank_id.id].append(line)
 
                 if not account_move.get(line.account_id.id, False):
                     account_move[line.account_id.id] = [line.id]
@@ -298,19 +300,18 @@ class account_move_line_group(osv.osv):
         return True
 
     def button_remake_etebac(self, cr, uid, ids, context):
-        account_journal_obj = self.pool.get('account.journal')
         for this in self.browse(cr, uid, ids, context=context):
             date_move = {}
             for line in this.account_move_line_ids:
                 if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
-                    if not line.partner_bank:
+                    if not line.partner_bank_id:
                         raise osv.except_osv(_('Error'), _('No account number define'))
                     if not date_move.get(line.date_maturity, False):
-                        date_move[line.date_maturity] = {line.partner_bank.id: [line]}
-                    elif not date_move[line.date_maturity].get(line.partner_bank.id, False):
-                        date_move[line.date_maturity][line.partner_bank.id] = [line]
+                        date_move[line.date_maturity] = {line.partner_bank_id.id: [line]}
+                    elif not date_move[line.date_maturity].get(line.partner_bank_id.id, False):
+                        date_move[line.date_maturity][line.partner_bank_id.id] = [line]
                     else:
-                        date_move[line.date_maturity][line.partner_bank.id].append(line)
+                        date_move[line.date_maturity][line.partner_bank_id.id].append(line)
 
             if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
                 buf = StringIO()
@@ -345,7 +346,7 @@ class account_move_line_group(osv.osv):
         if this.journal_id.type == 'purchase':
             self.etbac_format_move_emetteur(cr, uid, this, buf, '02', date, context=context)
             for account_id, lines in accounts.items():
-                bank = lines[0].partner_bank
+                bank = lines[0].partner_bank_id
                 amount_lines = 0
                 for line in lines:
                     amount_lines += line.credit - line.debit
@@ -465,7 +466,7 @@ class account_move_line_group(osv.osv):
             return ('%.2f' % number).replace('.', '')
 
         if line.debit > 0.0:
-            bank = line.partner_bank
+            bank = line.partner_bank_id
             if not bank:
                 raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % line.partner_id.name)
             A = '06'
@@ -596,110 +597,153 @@ class account_move_line(osv.osv):
         if partner_id:
             partner_obj = self.pool.get('res.partner')
             partner = partner_obj.browse(cr, uid, partner_id, context=context)
-            res['value'] = {'partner_bank': partner.bank_ids and len(partner.bank_ids) == 1 and partner.bank_ids[0].id or False}
+            res['value'] = {'partner_bank_id': partner.bank_ids and len(partner.bank_ids) == 1 and partner.bank_ids[0].id or False}
         return res
 
-    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context={}, toolbar=False):
-        result = super(osv.osv, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar=toolbar)
-        if view_type == 'tree' and context.get('journal_id', False):
-            title = self.view_header_get(cr, uid, view_id, view_type, context)
-            journal = self.pool.get('account.journal').browse(cr, uid, context['journal_id'])
+    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):
+        journal_pool = self.pool.get('account.journal')
+        if context is None:
+            context = {}
+        result = super(account_move_line, self).fields_view_get(cr, uid, view_id, view_type, context=context, toolbar=toolbar, submenu=submenu)
+        if view_type != 'tree':
+            #Remove the toolbar from the form view
+            if view_type == 'form':
+                if result.get('toolbar', False):
+                    result['toolbar']['action'] = []
+            #Restrict the list of journal view in search view
+            if view_type == 'search' and result['fields'].get('journal_id', False):
+                result['fields']['journal_id']['selection'] = journal_pool.name_search(cr, uid, '', [], context=context)
+                ctx = context.copy()
+                #we add the refunds journal in the selection field of journal
+                if context.get('journal_type', False) == 'sale':
+                    ctx.update({'journal_type': 'sale_refund'})
+                    result['fields']['journal_id']['selection'] += journal_pool.name_search(cr, uid, '', [], context=ctx)
+                elif context.get('journal_type', False) == 'purchase':
+                    ctx.update({'journal_type': 'purchase_refund'})
+                    result['fields']['journal_id']['selection'] += journal_pool.name_search(cr, uid, '', [], context=ctx)
+            return result
+        if context.get('view_mode', False):
+            return result
+        fld = []
+        fields = {}
+        flds = []
+        title = _("Accounting Entries") #self.view_header_get(cr, uid, view_id, view_type, context)
 
-            state = ''
-            if journal.view_id.color:
-                state = ' colors="' + journal.view_id.color + '"'
-
-            xml = '''<tree string="%s" editable="top" refresh="5" on_write="_on_create_write"%s>\n\t''' % (title, state)
-            fields = []
-            if context.get('display_select', False):
-                xml += '''<field name="select_to_payment" on_change="onchange_select_to_payment(partner_id)"/>\n'''
-                fields.append('select_to_payment')
-                xml += '''<field name="partner_bank" domain="[('partner_id', '=', partner_id)]"/>\n'''
-                fields.append('partner_bank')
-                if journal.type == 'purchase':
-                    xml += '''<field name="blocked"/>\n'''
-                    fields.append('blocked')
-
-            widths = {
-                'ref': 50,
-                'statement_id': 50,
-                'state': 60,
-                'tax_code_id': 50,
-                'move_id': 40,
-            }
-            fields_list = []
+        ids = journal_pool.search(cr, uid, [])
+        journals = journal_pool.browse(cr, uid, ids, context=context)
+        all_journal = [None]
+        common_fields = {}
+        total = len(journals)
+        for journal in journals:
+            all_journal.append(journal.id)
             for field in journal.view_id.columns_id:
-                fields_list.append((field, True))
-            fields_name = [field.field for field in journal.view_id.columns_id]
-            if 'journal_id' not in fields_list:
-                fields_list.append(('journal_id', False))
-            if 'account_required_fields' not in fields_list:
-                fields_list.append(('account_required_fields', False))
-            if 'journal_required_fields' not in fields_list:
-                fields_list.append(('journal_required_fields', False))
-            if 'journal_type' not in fields_list:
-                fields_list.append(('journal_type', False))
-            if 'move_type_id' not in fields_list:
-                fields_list.append(('move_type_id', False))
-
-            for field, column in fields_list:
-                if column:
-                    fields.append(field.field)
-                    attrs = []
-                    if context.get('display_select', False) and field.field != 'date_maturity':
-                        attrs.append('readonly="1"')
-
-                    if field.field == 'debit':
-                        attrs.append('sum="Total debit"')
-                    elif field.field == 'credit':
-                        attrs.append('sum="Total credit"')
-                    elif field.field == 'account_tax_id':
-                        attrs.append('domain="[(\'parent_id\',\'=\',False)]"')
-                    elif field.field == 'account_id' and journal.id:
-                        attrs.append('domain="[(\'journal_id\', \'=\', ' + str(journal.id) + '),(\'type\',\'&lt;&gt;\',\'view\'), (\'type\',\'&lt;&gt;\',\'closed\')]" on_change="onchange_account_id(account_id, partner_id)"')
-                    elif field.field == 'partner_id':
-                        attrs.append('on_change="onchange_partner_id(move_id,partner_id,account_id,debit,credit,date,((\'journal_id\' in context) and context[\'journal_id\']) or {})"')
-                        attrs.append('attrs="{\'required\': [(\'journal_required_fields\', \'=\', True)]}"')
-                    elif field.field == 'journal_id':
-                        attrs.append('on_change="onchange_journal_id(journal_id)"')
-                    elif field.field == 'move_type_id':
-                        attrs.append('domain="[(\'type\', \'=\', journal_type)]"')
-                        attrs.append('attrs="{\'required\': [(\'journal_required_fields\', \'=\', True)]}"')
-                    elif field.field == 'date_maturity':
-                        attrs.append('attrs="{\'required\': [(\'journal_required_fields\', \'=\', True)]}"')
-                    elif field.field == 'partner_bank':
-                        attrs.append('domain="[(\'partner_id\', \'=\', \'partner_id\')]"')
-                    if field.readonly:
-                        attrs.append('readonly="1"')
-                    if field.required:
-                        attrs.append('required="1"')
-                    else:
-                        attrs.append('required="0"')
-                    if field.field in ('amount_currency', 'currency_id'):
-                        attrs.append('on_change="onchange_currency(account_id,amount_currency,currency_id,date,((\'journal_id\' in context) and context[\'journal_id\']) or {})"')
-
-                    if field.field in widths:
-                        attrs.append('width="' + str(widths[field.field]) + '"')
-                    xml += '''<field name="%s" %s/>\n''' % (field.field, ' '.join(attrs))
+                if not field.field in fields:
+                    fields[field.field] = [journal.id]
+                    fld.append((field.field, field.sequence))
+                    flds.append(field.field)
+                    common_fields[field.field] = 1
                 else:
-                    fields.append(field)
-                    if field == 'journal_id':
-                        xml += '''<field name="journal_id" on_change="onchange_journal_id(journal_id)" invisible="1"/>\n'''
-                    elif field == 'journal_required_fields':
-                        xml += '''<field name="journal_required_fields" invisible="1"/>\n'''
-                    elif field == 'account_required_fields':
-                        xml += '''<field name="account_required_fields" invisible="1"/>\n'''
-                    elif field == 'journal_id':
-                        xml += '''<field name="journal_type" invisible="1"/>\n'''
-                    elif field == 'move_type_id':
-                        if context.get('display_select', False):
-                            xml += '''<field name="move_type_id" readonly="1"/>'''
-                        else:
-                            xml += '''<field name="move_type_id" domain="[('type', '=', journal_type)]" attrs="{'required': [('journal_required_fields', '=', True), ('account_required_fields', '=', True)]}"/>'''
+                    fields.get(field.field).append(journal.id)
+                    common_fields[field.field] = common_fields[field.field] + 1
+        fld.append(('period_id', 3))
+        fld.append(('journal_id', 10))
+        fld.append(('journal_type', 50))
+        fld.append(('journal_required_fields', 60))
+        fld.append(('account_required_fields', 70))
+        fld.append(('move_type_id', 80))
+        fld.append(('select_to_payment', 90))
+        flds.append('period_id')
+        flds.append('journal_id')
+        flds.append(('journal_type'))
+        flds.append(('journal_required_fields'))
+        flds.append(('account_required_fields'))
+        flds.append(('move_type_id'))
+        flds.append(('select_to_payment'))
+        fields['period_id'] = all_journal
+        fields['journal_id'] = all_journal
+        fields['journal_type'] = all_journal
+        fields['journal_required_fields'] = all_journal
+        fields['account_required_fields'] = all_journal
+        fields['move_type_id'] = all_journal
+        fields['select_to_payment'] = all_journal
+        fld = sorted(fld, key=itemgetter(1))
+        widths = {
+            'statement_id': 50,
+            'state': 60,
+            'tax_code_id': 50,
+            'move_id': 40,
+        }
 
-            xml += '''</tree>'''
-            result['arch'] = xml
-            result['fields'] = self.fields_get(cr, uid, fields, context)
+        document = etree.Element('tree', string=title, editable="top",
+                                 refresh="5", on_write="on_create_write",
+                                 colors="red:state=='draft';black:state=='valid'")
+        fields_get = self.fields_get(cr, uid, flds, context)
+        for field, _seq in fld:
+            if common_fields.get(field) == total:
+                fields.get(field).append(None)
+            # if field=='state':
+            #     state = 'colors="red:state==\'draft\'"'
+            f = etree.SubElement(document, 'field', name=field)
+
+            if field == 'debit':
+                f.set('sum', _("Total debit"))
+
+            elif field == 'credit':
+                f.set('sum', _("Total credit"))
+
+            elif field == 'move_id':
+                f.set('required', 'False')
+
+            elif field == 'account_tax_id':
+                f.set('domain', "[('parent_id', '=' ,False)]")
+                f.set('context', "{'journal_id': journal_id}")
+
+            elif field == 'account_id' and journal.id:
+                f.set('domain', "[('journal_id', '=', journal_id),('type','!=','view'), ('type','!=','closed')]")
+                f.set('on_change', 'onchange_account_id(account_id, partner_id)')
+
+            elif field == 'partner_id':
+                f.set('on_change', 'onchange_partner_id(move_id, partner_id, account_id, debit, credit, date, journal_id)')
+
+            elif field == 'journal_id':
+                f.set('context', "{'journal_id': journal_id}")
+                f.set('on_change', 'onchange_journal_id(journal_id)')
+
+            elif field == 'statement_id':
+                f.set('domain', "[('state', '!=', 'confirm'),('journal_id.type', '=', 'bank')]")
+                f.set('invisible', 'True')
+
+            elif field == 'date':
+                f.set('on_change', 'onchange_date(date)')
+
+            elif field == 'analytic_account_id':
+                # Currently it is not working due to being executed by superclass's fields_view_get
+                # f.set('groups', 'analytic.group_analytic_accounting')
+                pass
+
+            #elif field in ('journal_type', 'journal_required_fields', 'account_required_fields', 'select_to_payment', 'move_type_id'):
+            #    f.set('invisible', 'True')
+
+            elif field == 'select_to_payment':
+                f.set('on_change', 'onchange_select_to_payment(partner_id)')
+
+            if field in ('amount_currency', 'currency_id'):
+                f.set('on_change', 'onchange_currency(account_id, amount_currency, currency_id, date, journal_id)')
+                f.set('attrs', "{'readonly': [('state', '=', 'valid')]}")
+
+            if field in widths:
+                f.set('width', str(widths[field]))
+
+            if field in ('journal_id',):
+                f.set("invisible", "context.get('journal_id', False)")
+            elif field in ('period_id',):
+                f.set("invisible", "context.get('period_id', False)")
+
+            orm.setup_modifiers(f, fields_get[field], context=context,
+                                in_tree_view=True)
+
+        result['arch'] = etree.tostring(document, pretty_print=True)
+        result['fields'] = fields_get
         return result
 
     def onchange_account_id(self, cr, uid, ids, account_id=False, partner_id=False):
@@ -722,7 +766,7 @@ class account_move_line(osv.osv):
                 if len(tmp_partner_banks) == 1:
                     partner_banks = tmp_partner_banks
             if partner_banks:
-                values['value']['partner_bank'] = partner_banks[0]
+                values['value']['partner_bank_id'] = partner_banks[0]
 
         return values
 
