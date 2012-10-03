@@ -236,10 +236,10 @@ class account_move_line_group(osv.osv):
 
         return super(account_move_line_group, self).create(cr, uid, values, context=context)
 
-    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context={}, toolbar=False):
+    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):
         if context:
             context['display_select'] = True
-        result = super(osv.osv, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar=toolbar)
+        result = super(osv.osv, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar=toolbar, submenu=submenu)
         if context.get('journal_id'):
             res = self.pool.get('account.move.line').fields_view_get(cr, uid, view_type='tree', context=context)
             result['fields']['account_move_line_ids']['views'] = {
@@ -562,6 +562,7 @@ class account_move_line(osv.osv):
         'move_type_id': fields.many2one('account.move.type', 'Type', help="type of payment"),
         'account_move_line_group_id': fields.many2one('account.move.line.group', 'Group of line', help="All the line with this group have send in the same bank as the same time"),
         'select_to_payment': fields.boolean('Select', help="If check, the move will be paid"),
+        'partner_bank_id': fields.many2one('res.partner.bank','Bank Account'),
     }
 
     _defaults = {
@@ -652,6 +653,7 @@ class account_move_line(osv.osv):
         fld.append(('account_required_fields', 70))
         fld.append(('move_type_id', 80))
         fld.append(('select_to_payment', 90))
+        fld.append(('partner_bank_id', 90))
         flds.append('period_id')
         flds.append('journal_id')
         flds.append(('journal_type'))
@@ -659,6 +661,7 @@ class account_move_line(osv.osv):
         flds.append(('account_required_fields'))
         flds.append(('move_type_id'))
         flds.append(('select_to_payment'))
+        flds.append(('partner_bank_id'))
         fields['period_id'] = all_journal
         fields['journal_id'] = all_journal
         fields['journal_type'] = all_journal
@@ -666,6 +669,7 @@ class account_move_line(osv.osv):
         fields['account_required_fields'] = all_journal
         fields['move_type_id'] = all_journal
         fields['select_to_payment'] = all_journal
+        fields['partner_bank_id'] = all_journal
         fld = sorted(fld, key=itemgetter(1))
         widths = {
             'statement_id': 50,
@@ -721,7 +725,7 @@ class account_move_line(osv.osv):
                 # f.set('groups', 'analytic.group_analytic_accounting')
                 pass
 
-            #elif field in ('journal_type', 'journal_required_fields', 'account_required_fields', 'select_to_payment', 'move_type_id'):
+            #elif field in ('journal_type', 'journal_required_fields', 'account_required_fields', 'select_to_payment', 'move_type_id', 'partner_bank_id'):
             #    f.set('invisible', 'True')
 
             elif field == 'select_to_payment':
