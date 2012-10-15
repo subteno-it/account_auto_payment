@@ -163,11 +163,14 @@
             <field name="priority" eval="8"/>
             <field name="arch" type="xml">
                 <form string="Select moves">
-                    <field name="journal_id" invisible="1" select="1"/>
-                    <field name="account_move_line_ids" colspan="4" nolabel="1" select="1"/>
-                    <field name="state" readonly="1" select="1"/>
-                    <button string="Validate" states="draft" type="object" name="button_done"/>
-                    <field name="etebac" attrs="{'readonly': [('states', '!=', 'done')]}"/>
+                    <field name="journal_id" invisible="1"/>
+                    <newline/>
+                    <field name="account_move_line_ids" colspan="4" nolabel="1"/>
+                    <newline/>
+                    <field name="state" readonly="1"/>
+                    <button string="Validate" states="draft" type="object" name="button_done" icon="gtk-execute"/>
+                    <newline/>
+                    <field name="etebac" attrs="{'readonly': [('state', '!=', 'done')]}"/>
                 </form>
             </field>
         </record>
@@ -212,15 +215,30 @@
             <field name="arch" type="xml">
                 <form string="History">
                     <group colspan="4">
-                        <field name="journal_id" readonly="1" select="1"/>
-                        <field name="maturity_date" readonly="1" select="1"/>
-                        <field name="payment_date" readonly="1" select="1"/>
-                        <field name="bank_journal_id" readonly="1" select="1"/>
+                        <field name="journal_id" readonly="1"/>
+                        <field name="maturity_date" readonly="1"/>
+                        <field name="payment_date" readonly="1"/>
+                        <field name="bank_journal_id" readonly="1"/>
                     </group>
                     <field name="account_move_line_ids" colspan="4" nolabel="1" readonly="1"/>
                     <button string="Remake etebac" states="draft" type="object" name="button_remake_etebac" icon="gtk-go-forward"/>
                     <field name="etebac"/>
                 </form>
+            </field>
+        </record>
+
+        <record id="view_account_move_line_group_history_search" model="ir.ui.view">
+            <field name="name">account.move.line.group.search</field>
+            <field name="model">account.move.line.group</field>
+            <field name="type">search</field>
+            <field name="priority" eval="8"/>
+            <field name="arch" type="xml">
+                <search string="History">
+                    <field name="journal_id"/>
+                    <field name="maturity_date"/>
+                    <field name="payment_date"/>
+                    <field name="bank_journal_id"/>
+                </search>
             </field>
         </record>
 
@@ -230,6 +248,7 @@
             <field name="res_model">account.move.line.group</field>
             <field name="view_type">form</field>
             <field name="view_mode">tree,form</field>
+            <field name="search_view_id" ref="view_account_move_line_group_history_search"/>
             <field name="domain">[]</field>
             <field name="context">{}</field>
         </record>

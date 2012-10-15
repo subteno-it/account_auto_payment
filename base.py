@@ -2,9 +2,8 @@
 ##############################################################################
 #
 #    account_auto_payment module for OpenERP, add wizard to make the payment auto
-#    Copyright (C) 2011 SYLEAM Info Services (<http://www.syleam.fr/>)
-#              Jean-Sébastien SUZANNE <jean-sebastien.suzanne@syleam.fr>
-#              Sébastien LANGE <sebastien.lange@syleam.fr>
+#    Copyright (C) 2012 SYLEAM Info Services (<http://www.syleam.fr/>)
+#              Sebastien LANGE <sebastien.lange@syleam.fr>
 #
 #    This file is a part of account_auto_payment
 #
@@ -23,31 +22,17 @@
 #
 ##############################################################################
 
-{
-    'name': 'Account Auto Payment',
-    'version': '1.0',
-    'category': 'Custom',
-    'description': """Add wizard to make the payment auto""",
-    'author': 'SYLEAM',
-    'website': 'http://www.syleam.fr/',
-    'depends': [
-        'account',
-        'base',
-    ],
-    'init_xml': [],
-    'update_xml': [
-        'security/ir.model.access.csv',
-        'account_view.xml',
-        'base_view.xml',
-        'account_data.xml',
-        'wizard/account_auto_payment.xml',
-        'account_workflow.xml',
-    ],
-    'demo_xml': [],
-    'installable': True,
-    'active': False,
-    'license': 'GPL-3',
-}
+from osv import osv
+
+
+class res_partner_bank(osv.osv):
+    _inherit = 'res.partner.bank'
+
+    _defaults = {
+        'sequence': 10,
+    }
+
+res_partner_bank()
 
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:

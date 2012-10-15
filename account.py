@@ -242,12 +242,13 @@ class account_move_line_group(osv.osv):
         result = super(osv.osv, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar=toolbar, submenu=submenu)
         if context.get('journal_id'):
             res = self.pool.get('account.move.line').fields_view_get(cr, uid, view_type='tree', context=context)
-            result['fields']['account_move_line_ids']['views'] = {
-                'tree': {
-                    'arch': res['arch'],
-                    'fields': res['fields'],
-                },
-            }
+            if result['fields'].get('account_move_line_ids', False):
+                result['fields']['account_move_line_ids']['views'] = {
+                    'tree': {
+                        'arch': res['arch'],
+                        'fields': res['fields'],
+                    },
+                }
         return result
 
     def button_done(self, cr, uid, ids, context):
@@ -373,7 +374,7 @@ class account_move_line_group(osv.osv):
         rib = user.company_id.partner_id.bank_ids and user.company_id.partner_id.bank_ids[0] or False
         if not rib:
             raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % user.company_id.name)
-        if not rib.guichet or not rib.compte or not rib.banque:
+        if not rib.office or not rib.rib_acc_number or not rib.bank_code:
             raise osv.except_osv(_('Erreur'), _('Informations RIB manquantes !'))
         A = '03'
         B1 = mode.ljust(2)
@@ -388,11 +389,11 @@ class account_move_line_group(osv.osv):
         D2_1 = ' ' * 2
         D2_2 = 'E'
         D2_3 = ' ' * 5
-        D3 = str(rib.guichet).ljust(5).upper()
-        D4 = str(rib.compte).ljust(11).upper()
+        D3 = str(rib.office).ljust(5).upper()
+        D4 = str(rib.rib_acc_number).ljust(11).upper()
         E = ' ' * 16
         F = ' ' * 31
-        G1 = str(rib.banque).ljust(5).upper()
+        G1 = str(rib.bank_code).ljust(5).upper()
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1_1 + C1_2 + C1_3 + C2 + D1_1 + D1_2 + D2_1 + D2_2 + D2_3 + D3 + D4 + E + F + G1 + G2
         if len(str_etbac) != 160:
@@ -406,7 +407,7 @@ class account_move_line_group(osv.osv):
         rib = user.company_id.partner_id.bank_ids and user.company_id.partner_id.bank_ids[0] or False
         if not rib:
             raise osv.except_osv('Information de banque', 'Le partenaire de la societe %s ne dispose d\'aucune banque' % user.company_id.name)
-        if not rib.guichet or not rib.compte or not rib.banque:
+        if not rib.office or not rib.rib_acc_number or not rib.bank_code:
             raise osv.except_osv(_('Erreur'), _('Informations RIB manquantes !'))
         A = '03'
         B1 = mode.ljust(2)
@@ -419,9 +420,9 @@ class account_move_line_group(osv.osv):
         D2_1 = '3'
         D2_2 = ' '
         D2_3 = 'E'
-        D3 = str(rib.banque).ljust(5).upper()
-        D4 = str(rib.guichet).ljust(5).upper()
-        D5 = str(rib.compte).ljust(11).upper()
+        D3 = str(rib.bank_code).ljust(5).upper()
+        D4 = str(rib.office).ljust(5).upper()
+        D5 = str(rib.rib_acc_number).ljust(11).upper()
         E = ' ' * 16
         F1 = ' ' * 6
         F2 = ' ' * 10
@@ -445,11 +446,11 @@ class account_move_line_group(osv.osv):
         C2 = str(line.partner_id.name).ljust(24)[:24].upper()
         D1 = str(bank.bank and bank.bank.name or '')[:24].ljust(24).upper()
         D2 = ' ' * 8
-        D3 = str(bank.guichet).rjust(5, '0')
-        D4 = str(bank.compte).rjust(11, '0')
+        D3 = str(bank.office).rjust(5, '0')
+        D4 = str(bank.rib_acc_number).rjust(11, '0')
         E = str(amount).zfill(16)
         F = str(line.name or ' ')[:31].ljust(31).upper()
-        G1 = str(bank.banque).rjust(5, '0')
+        G1 = str(bank.bank_code).rjust(5, '0')
         G2 = ' ' * 6
         str_etbac = A + B1 + B2 + B3 + C1 + C2 + D1 + D2 + D3 + D4 + E + F + G1 + G2
         if len(str_etbac) != 160:
@@ -479,9 +480,9 @@ class account_move_line_group(osv.osv):
             D1 = str(bank.bank and bank.bank.name or bank.name or ' ')[:24].ljust(24).upper()
             D2_1 = line.move_type_id and line.move_type_id.traite_code.ljust(1) or '0'
             D2_2 = ' ' * 2
-            D3 = str(bank.banque).rjust(5, '0')
-            D4 = str(bank.guichet).rjust(5, '0')
-            D5 = str(bank.compte).rjust(11, '0')
+            D3 = str(bank.bank_code).rjust(5, '0')
+            D4 = str(bank.office).rjust(5, '0')
+            D5 = str(bank.rib_acc_number).rjust(11, '0')
             E1 = f_str(line.debit).zfill(12)
             E2 = ' ' * 4
             date = line.date_maturity
@@ -764,7 +765,7 @@ class account_move_line(osv.osv):
             values['value']['account_required_fields'] = account.user_type.required_fields
         if partner_id:
             partner_bank_obj = self.pool.get('res.partner.bank')
-            partner_banks = partner_bank_obj.search(cr, uid, [('partner_id', '=', partner_id), ('default_bank', '=', True)])
+            partner_banks = partner_bank_obj.search(cr, uid, [('partner_id', '=', partner_id)])
             if not partner_banks:
                 tmp_partner_banks = partner_bank_obj.search(cr, uid, [('partner_id', '=', partner_id)])
                 if len(tmp_partner_banks) == 1:
