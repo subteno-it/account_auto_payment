@@ -70,23 +70,32 @@ class account_journal(osv.osv):
         reconcile = []
         account_id = False
 
+        # Création de l'entete d'écriture, qui va accueillir le mouvement de banque ainsi que le mouvement 411/413 ou 401
         move_id = self.pool.get('account.move').create(cr, uid, {'date': payment_date, 'journal_id': bank_journal.id, 'period_id': period_id}, context=ctx)
 
+        # Pour les traites et les chèques, on prend le compte comptable définit sur le journal
         if journal.type in ('traite', 'cheque'):
             account_id = journal.default_debit_account_id and journal.default_debit_account_id.id or False
 
-        # Stockage temporaire pour regrouper les lignes d'écriture par compte fournisseur
+        # Stockage temporaire pour regrouper les lignes d'écriture par compte fournisseur ou traite
+        # Car un paiement fournisseur ou client peut concerner plusieurs factures, et on doit déduire les avoirs aussi.
         groupir = {}
+        groupir2 = {}  # Grouper les ligne dans le cadre de traite par ecriture
         for move in account_move_line_obj.browse(cr, uid, move_ids, context=ctx):
             debit += move.debit
             credit += move.credit
+            # Pour les achats on regroupe par compte compatble
+            # Pour les traite, 1 traite = 1 écriture
             if journal.type == 'purchase':
                 if groupir.get(move.account_id.id):
                     groupir[move.account_id.id].append(move.id)
                 else:
                     groupir[move.account_id.id] = [move.id]
+            elif journal.type == 'traite':
+                groupir2[move.id] = [move.id]
 
-        # Pour chaque compte comptable, on a regrouper les lignes d'écritures, on crée 1 seul ecriture de banque
+        # Pour chaque compte comptable, on a regrouper les lignes d'écritures,
+        # on crée 1 seul ecriture de banque
         if journal.type == 'purchase':
             for acc_id, m_ids in groupir.items():
                 tmp_ids = m_ids
@@ -118,8 +127,46 @@ class account_journal(osv.osv):
                     'account_move_line_group_id': False,
                     'select_to_payment': False,
                 }
-                # On ajoute l'écriture fournisseur du journal de banque aux écritures du journal d'achat
+                # On ajoute l'écriture fournisseur du journal de banque, aux écritures du journal d'achat
                 # pour les réconciliés à la fin
+                tmp_ids.append(account_move_line_obj.copy(cr, uid, m_ids[0], vals, context=ctx))
+                reconcile.append(tmp_ids)
+        elif journal.type == 'traite':
+            # Pour chaque traite on creer une ligne d'écriture
+            # 1 traite peut concerner X factures
+            # que l'on va réconcilié directement
+            # Ex: le 413XXX au crédit, avec les 413XXX au débit
+            for acc_id, m_ids in groupir2.items():
+                tmp_ids = m_ids
+                tdebit = 0
+                gdebit = 0
+                gcredit = 0
+                for gmove in account_move_line_obj.browse(cr, uid, m_ids, context=ctx):
+                    gdebit += gmove.debit
+                    gcredit += gmove.credit
+
+                # comme seul un montant peut etre soit au crédit ou au débit
+                # on compare, pour mettre l'un des 2 à 0
+                if gcredit > gdebit:
+                    tcredit = gcredit - gdebit
+                    tdebit = 0
+                else:
+                    tcredit = 0
+                    tdebit = gdebit - gcredit
+
+                vals = {
+                    'date': payment_date,
+                    'journal_id': bank_journal.id,
+                    'debit': tcredit,
+                    'credit': tdebit,
+                    'period_id': period_id,
+                    'move_type_id': False,
+                    'move_id': move_id,
+                    'journal_type': 'cash',
+                    'journal_required_fields': False,
+                    'account_move_line_group_id': False,
+                    'select_to_payment': False,
+                }
                 tmp_ids.append(account_move_line_obj.copy(cr, uid, m_ids[0], vals, context=ctx))
                 reconcile.append(tmp_ids)
 
@@ -131,24 +178,27 @@ class account_journal(osv.osv):
                 raise osv.except_osv(_('Error'), _('Pas de type définis'))
             debit = debit - credit
             credit = 0
-            vals = {
-                'name': journal.name,
-                'date': payment_date,
-                'journal_id': bank_journal.id,
-                'debit': credit,
-                'credit': debit,
-                'period_id': period_id,
-                'move_type_id': False,
-                'move_id': move_id,
-                'journal_type': 'cash',
-                'journal_required_fields': False,
-                'account_id': account_id,
-                'account_move_line_group_id': False,
-                'select_to_payment': False,
-            }
-            move_ids.append(account_move_line_obj.create(cr, uid, vals, context=ctx))
+            # Le cheque possède sont écritures, par contre 1 chèque paye 1 facture a la fois
+            # c'est pour cela que l'on ne le traite pas de la meme facon que les traites
+            if journal.type == 'cheque':
+                vals = {
+                    'name': journal.name,
+                    'date': payment_date,
+                    'journal_id': bank_journal.id,
+                    'debit': credit,
+                    'credit': debit,
+                    'period_id': period_id,
+                    'move_type_id': False,
+                    'move_id': move_id,
+                    'journal_type': 'cash',
+                    'journal_required_fields': False,
+                    'account_id': account_id,
+                    'account_move_line_group_id': False,
+                    'select_to_payment': False,
+                }
+                move_ids.append(account_move_line_obj.create(cr, uid, vals, context=ctx))
 
-        # Creation du mouvement de banque associé
+        # Creation du mouvement de banque associé 512
         vals = {
             'date': payment_date,
             'name': bank_journal.name,
@@ -166,10 +216,10 @@ class account_journal(osv.osv):
         }
         account_move_line_obj.create(cr, uid, vals, context=ctx)
 
-        if journal.type == 'purchase':
+        if journal.type in ('purchase', 'traite'):
             for line_ids in reconcile:
                 account_move_line_obj.reconcile(cr, uid, line_ids, context=context)
-        elif journal.type in ('traite', 'cheque'):
+        elif journal.type == 'cheque':
             account_move_line_obj.reconcile(cr, uid, move_ids, context=context)
 
 account_journal()
@@ -263,7 +313,7 @@ class account_move_line_group(osv.osv):
 
                 if this.journal_id.make_etebac and this.bank_journal_id.make_etebac:
                     if not line.partner_bank:
-                        raise osv.except_osv(_('Error'), _('No account number define'))
+                        raise osv.except_osv(_('Error'), _('No Bank account define for:\n"%s"') % line.partner_id.name)
                     if not date_move.get(line.date_maturity, False):
                         date_move[line.date_maturity] = {line.partner_bank.id: [line]}
                     elif not date_move[line.date_maturity].get(line.partner_bank.id, False):
